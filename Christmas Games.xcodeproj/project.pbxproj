@@ -7,26 +7,26 @@
 	objects = {
 
 /* Begin PBXContainerItemProxy section */
-		8119E0662EF1F4E200AC97B3 /* PBXContainerItemProxy */ = {
+		8119E0B92EF2018C00AC97B3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8119E0502EF1F4E000AC97B3 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 8119E0572EF1F4E000AC97B3;
+			remoteGlobalIDString = 8119E0AB2EF2018A00AC97B3;
 			remoteInfo = "Christmas Games";
 		};
-		8119E0702EF1F4E200AC97B3 /* PBXContainerItemProxy */ = {
+		8119E0C32EF2018C00AC97B3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8119E0502EF1F4E000AC97B3 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 8119E0572EF1F4E000AC97B3;
+			remoteGlobalIDString = 8119E0AB2EF2018A00AC97B3;
 			remoteInfo = "Christmas Games";
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		8119E0582EF1F4E000AC97B3 /* Christmas Games.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Christmas Games.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		8119E0652EF1F4E200AC97B3 /* Christmas GamesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Christmas GamesTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		8119E06F2EF1F4E200AC97B3 /* Christmas GamesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Christmas GamesUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8119E0AC2EF2018A00AC97B3 /* Christmas Games.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Christmas Games.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8119E0B82EF2018C00AC97B3 /* Christmas GamesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Christmas GamesTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8119E0C22EF2018C00AC97B3 /* Christmas GamesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Christmas GamesUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -45,24 +45,39 @@
 			path = "Christmas GamesUITests";
 			sourceTree = "<group>";
 		};
+		8119E0AD2EF2018A00AC97B3 /* Christmas Games */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Christmas Games";
+			sourceTree = "<group>";
+		};
+		8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Christmas GamesTests";
+			sourceTree = "<group>";
+		};
+		8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Christmas GamesUITests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		8119E0552EF1F4E000AC97B3 /* Frameworks */ = {
+		8119E0A92EF2018A00AC97B3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E0622EF1F4E200AC97B3 /* Frameworks */ = {
+		8119E0B52EF2018C00AC97B3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E06C2EF1F4E200AC97B3 /* Frameworks */ = {
+		8119E0BF2EF2018C00AC97B3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -78,6 +93,9 @@
 				8119E05A2EF1F4E000AC97B3 /* Christmas Games */,
 				8119E0682EF1F4E200AC97B3 /* Christmas GamesTests */,
 				8119E0722EF1F4E200AC97B3 /* Christmas GamesUITests */,
+				8119E0AD2EF2018A00AC97B3 /* Christmas Games */,
+				8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */,
+				8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */,
 				8119E0592EF1F4E000AC97B3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,9 +103,9 @@
 		8119E0592EF1F4E000AC97B3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				8119E0582EF1F4E000AC97B3 /* Christmas Games.app */,
-				8119E0652EF1F4E200AC97B3 /* Christmas GamesTests.xctest */,
-				8119E06F2EF1F4E200AC97B3 /* Christmas GamesUITests.xctest */,
+				8119E0AC2EF2018A00AC97B3 /* Christmas Games.app */,
+				8119E0B82EF2018C00AC97B3 /* Christmas GamesTests.xctest */,
+				8119E0C22EF2018C00AC97B3 /* Christmas GamesUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,13 +113,13 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8119E0572EF1F4E000AC97B3 /* Christmas Games */ = {
+		8119E0AB2EF2018A00AC97B3 /* Christmas Games */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8119E0792EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas Games" */;
+			buildConfigurationList = 8119E0CA2EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas Games" */;
 			buildPhases = (
-				8119E0542EF1F4E000AC97B3 /* Sources */,
-				8119E0552EF1F4E000AC97B3 /* Frameworks */,
-				8119E0562EF1F4E000AC97B3 /* Resources */,
+				8119E0A82EF2018A00AC97B3 /* Sources */,
+				8119E0A92EF2018A00AC97B3 /* Frameworks */,
+				8119E0AA2EF2018A00AC97B3 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -109,58 +127,59 @@
 			);
 			fileSystemSynchronizedGroups = (
 				8119E05A2EF1F4E000AC97B3 /* Christmas Games */,
+				8119E0AD2EF2018A00AC97B3 /* Christmas Games */,
 			);
 			name = "Christmas Games";
 			packageProductDependencies = (
 			);
 			productName = "Christmas Games";
-			productReference = 8119E0582EF1F4E000AC97B3 /* Christmas Games.app */;
+			productReference = 8119E0AC2EF2018A00AC97B3 /* Christmas Games.app */;
 			productType = "com.apple.product-type.application";
 		};
-		8119E0642EF1F4E200AC97B3 /* Christmas GamesTests */ = {
+		8119E0B72EF2018C00AC97B3 /* Christmas GamesTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8119E07C2EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesTests" */;
+			buildConfigurationList = 8119E0CD2EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesTests" */;
 			buildPhases = (
-				8119E0612EF1F4E200AC97B3 /* Sources */,
-				8119E0622EF1F4E200AC97B3 /* Frameworks */,
-				8119E0632EF1F4E200AC97B3 /* Resources */,
+				8119E0B42EF2018C00AC97B3 /* Sources */,
+				8119E0B52EF2018C00AC97B3 /* Frameworks */,
+				8119E0B62EF2018C00AC97B3 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				8119E0672EF1F4E200AC97B3 /* PBXTargetDependency */,
+				8119E0BA2EF2018C00AC97B3 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				8119E0682EF1F4E200AC97B3 /* Christmas GamesTests */,
+				8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */,
 			);
 			name = "Christmas GamesTests";
 			packageProductDependencies = (
 			);
 			productName = "Christmas GamesTests";
-			productReference = 8119E0652EF1F4E200AC97B3 /* Christmas GamesTests.xctest */;
+			productReference = 8119E0B82EF2018C00AC97B3 /* Christmas GamesTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		8119E06E2EF1F4E200AC97B3 /* Christmas GamesUITests */ = {
+		8119E0C12EF2018C00AC97B3 /* Christmas GamesUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8119E07F2EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesUITests" */;
+			buildConfigurationList = 8119E0D02EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesUITests" */;
 			buildPhases = (
-				8119E06B2EF1F4E200AC97B3 /* Sources */,
-				8119E06C2EF1F4E200AC97B3 /* Frameworks */,
-				8119E06D2EF1F4E200AC97B3 /* Resources */,
+				8119E0BE2EF2018C00AC97B3 /* Sources */,
+				8119E0BF2EF2018C00AC97B3 /* Frameworks */,
+				8119E0C02EF2018C00AC97B3 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				8119E0712EF1F4E200AC97B3 /* PBXTargetDependency */,
+				8119E0C42EF2018C00AC97B3 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				8119E0722EF1F4E200AC97B3 /* Christmas GamesUITests */,
+				8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */,
 			);
 			name = "Christmas GamesUITests";
 			packageProductDependencies = (
 			);
 			productName = "Christmas GamesUITests";
-			productReference = 8119E06F2EF1F4E200AC97B3 /* Christmas GamesUITests.xctest */;
+			productReference = 8119E0C22EF2018C00AC97B3 /* Christmas GamesUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -173,16 +192,16 @@
 				LastSwiftUpdateCheck = 2610;
 				LastUpgradeCheck = 2610;
 				TargetAttributes = {
-					8119E0572EF1F4E000AC97B3 = {
+					8119E0AB2EF2018A00AC97B3 = {
 						CreatedOnToolsVersion = 26.1.1;
 					};
-					8119E0642EF1F4E200AC97B3 = {
+					8119E0B72EF2018C00AC97B3 = {
 						CreatedOnToolsVersion = 26.1.1;
-						TestTargetID = 8119E0572EF1F4E000AC97B3;
+						TestTargetID = 8119E0AB2EF2018A00AC97B3;
 					};
-					8119E06E2EF1F4E200AC97B3 = {
+					8119E0C12EF2018C00AC97B3 = {
 						CreatedOnToolsVersion = 26.1.1;
-						TestTargetID = 8119E0572EF1F4E000AC97B3;
+						TestTargetID = 8119E0AB2EF2018A00AC97B3;
 					};
 				};
 			};
@@ -200,29 +219,29 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8119E0572EF1F4E000AC97B3 /* Christmas Games */,
-				8119E0642EF1F4E200AC97B3 /* Christmas GamesTests */,
-				8119E06E2EF1F4E200AC97B3 /* Christmas GamesUITests */,
+				8119E0AB2EF2018A00AC97B3 /* Christmas Games */,
+				8119E0B72EF2018C00AC97B3 /* Christmas GamesTests */,
+				8119E0C12EF2018C00AC97B3 /* Christmas GamesUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		8119E0562EF1F4E000AC97B3 /* Resources */ = {
+		8119E0AA2EF2018A00AC97B3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E0632EF1F4E200AC97B3 /* Resources */ = {
+		8119E0B62EF2018C00AC97B3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E06D2EF1F4E200AC97B3 /* Resources */ = {
+		8119E0C02EF2018C00AC97B3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -232,21 +251,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		8119E0542EF1F4E000AC97B3 /* Sources */ = {
+		8119E0A82EF2018A00AC97B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E0612EF1F4E200AC97B3 /* Sources */ = {
+		8119E0B42EF2018C00AC97B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8119E06B2EF1F4E200AC97B3 /* Sources */ = {
+		8119E0BE2EF2018C00AC97B3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -256,15 +275,15 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		8119E0672EF1F4E200AC97B3 /* PBXTargetDependency */ = {
+		8119E0BA2EF2018C00AC97B3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 8119E0572EF1F4E000AC97B3 /* Christmas Games */;
-			targetProxy = 8119E0662EF1F4E200AC97B3 /* PBXContainerItemProxy */;
+			target = 8119E0AB2EF2018A00AC97B3 /* Christmas Games */;
+			targetProxy = 8119E0B92EF2018C00AC97B3 /* PBXContainerItemProxy */;
 		};
-		8119E0712EF1F4E200AC97B3 /* PBXTargetDependency */ = {
+		8119E0C42EF2018C00AC97B3 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 8119E0572EF1F4E000AC97B3 /* Christmas Games */;
-			targetProxy = 8119E0702EF1F4E200AC97B3 /* PBXContainerItemProxy */;
+			target = 8119E0AB2EF2018A00AC97B3 /* Christmas Games */;
+			targetProxy = 8119E0C32EF2018C00AC97B3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -322,7 +341,9 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -378,14 +399,16 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
 		};
-		8119E07A2EF1F4E200AC97B3 /* Debug */ = {
+		8119E0CB2EF2018C00AC97B3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -393,43 +416,33 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-Games";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		8119E07B2EF1F4E200AC97B3 /* Release */ = {
+		8119E0CC2EF2018C00AC97B3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -437,43 +450,34 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-Games";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.1;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		8119E07D2EF1F4E200AC97B3 /* Debug */ = {
+		8119E0CE2EF2018C00AC97B3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -482,24 +486,21 @@
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-GamesTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Christmas Games.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Christmas Games";
-				XROS_DEPLOYMENT_TARGET = 26.1;
 			};
 			name = Debug;
 		};
-		8119E07E2EF1F4E200AC97B3 /* Release */ = {
+		8119E0CF2EF2018C00AC97B3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -508,24 +509,22 @@
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-GamesTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Christmas Games.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Christmas Games";
-				XROS_DEPLOYMENT_TARGET = 26.1;
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		8119E0802EF1F4E200AC97B3 /* Debug */ = {
+		8119E0D12EF2018C00AC97B3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -533,24 +532,21 @@
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-GamesUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = "Christmas Games";
-				XROS_DEPLOYMENT_TARGET = 26.1;
 			};
 			name = Debug;
 		};
-		8119E0812EF1F4E200AC97B3 /* Release */ = {
+		8119E0D22EF2018C00AC97B3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -558,20 +554,18 @@
 				DEVELOPMENT_TEAM = 6R4KGW55X6;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
-				MACOSX_DEPLOYMENT_TARGET = 26.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "deanharmon.com.Christmas-GamesUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
+				SDKROOT = iphoneos;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = "Christmas Games";
-				XROS_DEPLOYMENT_TARGET = 26.1;
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -587,29 +581,29 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8119E0792EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas Games" */ = {
+		8119E0CA2EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas Games" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8119E07A2EF1F4E200AC97B3 /* Debug */,
-				8119E07B2EF1F4E200AC97B3 /* Release */,
+				8119E0CB2EF2018C00AC97B3 /* Debug */,
+				8119E0CC2EF2018C00AC97B3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8119E07C2EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesTests" */ = {
+		8119E0CD2EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8119E07D2EF1F4E200AC97B3 /* Debug */,
-				8119E07E2EF1F4E200AC97B3 /* Release */,
+				8119E0CE2EF2018C00AC97B3 /* Debug */,
+				8119E0CF2EF2018C00AC97B3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8119E07F2EF1F4E200AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesUITests" */ = {
+		8119E0D02EF2018C00AC97B3 /* Build configuration list for PBXNativeTarget "Christmas GamesUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				8119E0802EF1F4E200AC97B3 /* Debug */,
-				8119E0812EF1F4E200AC97B3 /* Release */,
+				8119E0D12EF2018C00AC97B3 /* Debug */,
+				8119E0D22EF2018C00AC97B3 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

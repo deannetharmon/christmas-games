@@ -6,6 +6,7 @@
 //
 
 import Testing
+@testable import Christmas_Games
 
 struct Christmas_GamesTests {
 

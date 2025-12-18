@@ -1,0 +1,25 @@
+{
+  "games": [
+    {
+      "externalId": "harmon_2025_candy_cane_duel",
+      "name": "Candy Cane Duel",
+      "groupName": "Warm Up",
+      "defaultTeamCount": 2,
+      "defaultPlayersPerTeam": 1,
+      "defaultRoundsPerGame": 5,
+      "teamType": "any",
+      "instructions": "Two players compete. Winner gets the round."
+    },
+    {
+      "externalId": "harmon_2025_couples_challenge",
+      "name": "Couples Challenge",
+      "groupName": "Couples",
+      "defaultTeamCount": 2,
+      "defaultPlayersPerTeam": 2,
+      "defaultRoundsPerGame": 4,
+      "teamType": "couplesOnly",
+      "instructions": "Spouse pairs compete as teams. Winner gets the round."
+    }
+  ]
+}
+
