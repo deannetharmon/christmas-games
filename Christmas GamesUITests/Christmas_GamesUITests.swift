@@ -1,41 +1,39 @@
-//
-//  Christmas_GamesUITests.swift
-//  Christmas GamesUITests
-//
-//  Created by Dean Roger Harmon on 12/16/25.
-//
-
 import XCTest
 
-final class Christmas_GamesUITests: XCTestCase {
-
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
-        continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+final class MainMenuUITests: XCTestCase {
+    
+    func testNavigateToGameCatalog() throws {
         let app = XCUIApplication()
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        
+        // Tap Game Catalog button
+        app.buttons["Game Catalog"].tap()
+        
+        // Verify we're on the Game Catalog screen
+        XCTAssertTrue(app.navigationBars["Game Catalog"].exists)
     }
-
-    @MainActor
-    func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+    
+    func testCreateNewEvent() throws {
+        let app = XCUIApplication()
+        app.launch()
+        
+        // Navigate to Events
+        let eventsButton = app.buttons["Events"]
+        XCTAssertTrue(eventsButton.exists)
+        eventsButton.tap()
+        
+        // Tap Add Event
+        app.buttons["Add Event"].tap()
+        
+        // Enter event name
+        let eventNameField = app.textFields["Event Name"]
+        eventNameField.tap()
+        eventNameField.typeText("Test Event 2025")
+        
+        // Save
+        app.buttons["Save"].tap()
+        
+        // Verify event appears in list
+        XCTAssertTrue(app.staticTexts["Test Event 2025"].exists)
     }
 }

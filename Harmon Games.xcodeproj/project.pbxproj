@@ -180,7 +180,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 8119E0532EF1F4E000AC97B3 /* Build configuration list for PBXProject "Christmas Games" */;
+			buildConfigurationList = 8119E0532EF1F4E000AC97B3 /* Build configuration list for PBXProject "Harmon Games" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -547,7 +547,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		8119E0532EF1F4E000AC97B3 /* Build configuration list for PBXProject "Christmas Games" */ = {
+		8119E0532EF1F4E000AC97B3 /* Build configuration list for PBXProject "Harmon Games" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				8119E0772EF1F4E200AC97B3 /* Debug */,
