@@ -13,12 +13,10 @@ struct Christmas_GamesApp: App {
             Round.self
         ])
 
-        // Put the store in Documents/Christmas Games so it’s easy to find/remove if needed
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let folder = docs.appendingPathComponent("Christmas Games", isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
-        // Bump this suffix any time you change SwiftData @Model storage in a non-migrating project
         let storeURL = folder.appendingPathComponent("ChristmasGames_v2.store")
 
         let configuration = ModelConfiguration(schema: schema, url: storeURL)
@@ -32,7 +30,7 @@ struct Christmas_GamesApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainMenuView()
         }
         .modelContainer(sharedModelContainer)
     }

@@ -45,21 +45,6 @@
 			path = "Christmas GamesUITests";
 			sourceTree = "<group>";
 		};
-		8119E0AD2EF2018A00AC97B3 /* Christmas Games */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Christmas Games";
-			sourceTree = "<group>";
-		};
-		8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Christmas GamesTests";
-			sourceTree = "<group>";
-		};
-		8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Christmas GamesUITests";
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,9 +78,6 @@
 				8119E05A2EF1F4E000AC97B3 /* Christmas Games */,
 				8119E0682EF1F4E200AC97B3 /* Christmas GamesTests */,
 				8119E0722EF1F4E200AC97B3 /* Christmas GamesUITests */,
-				8119E0AD2EF2018A00AC97B3 /* Christmas Games */,
-				8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */,
-				8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */,
 				8119E0592EF1F4E000AC97B3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -127,7 +109,6 @@
 			);
 			fileSystemSynchronizedGroups = (
 				8119E05A2EF1F4E000AC97B3 /* Christmas Games */,
-				8119E0AD2EF2018A00AC97B3 /* Christmas Games */,
 			);
 			name = "Christmas Games";
 			packageProductDependencies = (
@@ -149,9 +130,6 @@
 			dependencies = (
 				8119E0BA2EF2018C00AC97B3 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				8119E0BB2EF2018C00AC97B3 /* Christmas GamesTests */,
-			);
 			name = "Christmas GamesTests";
 			packageProductDependencies = (
 			);
@@ -171,9 +149,6 @@
 			);
 			dependencies = (
 				8119E0C42EF2018C00AC97B3 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				8119E0C52EF2018C00AC97B3 /* Christmas GamesUITests */,
 			);
 			name = "Christmas GamesUITests";
 			packageProductDependencies = (

@@ -1,0 +1,2797 @@
+################################################################################
+START FILE: ./CSVImportPreviewSheet.swift
+################################################################################
+   1 | import SwiftUI
+   2 | import SwiftData
+   3 | 
+   4 | struct CSVImportPreviewSheet: View {
+   5 |     @Environment(\.dismiss) private var dismiss
+   6 |     @Environment(\.modelContext) private var context
+   7 | 
+   8 |     let csvData: Data
+   9 |     let filename: String?
+  10 | 
+  11 |     private let maxPreviewRows = 25
+  12 |     private let maxPreviewColumns = 12
+  13 | 
+  14 |     @State private var parseResult: ParseResult = .empty
+  15 |     @State private var isImporting = false
+  16 | 
+  17 |     @State private var alertTitle = "Message"
+  18 |     @State private var alertMessage: String?
+  19 |     @State private var showAlert = false
+  20 | 
+  21 |     var body: some View {
+  22 |         NavigationStack {
+  23 |             Group {
+  24 |                 if parseResult.rows.isEmpty {
+  25 |                     ContentUnavailableView("No preview available", systemImage: "doc.text")
+  26 |                 } else {
+  27 |                     previewBody
+  28 |                 }
+  29 |             }
+  30 |             .navigationTitle("CSV Preview")
+  31 |             .navigationBarTitleDisplayMode(.inline)
+  32 |             .toolbar {
+  33 |                 ToolbarItem(placement: .topBarLeading) {
+  34 |                     Button("Cancel") { dismiss() }
+  35 |                         .disabled(isImporting)
+  36 |                 }
+  37 |                 ToolbarItem(placement: .topBarTrailing) {
+  38 |                     Button(isImporting ? "Importing…" : "Import") {
+  39 |                         importNow()
+  40 |                     }
+  41 |                     .disabled(isImporting)
+  42 |                 }
+  43 |             }
+  44 |             .onAppear {
+  45 |                 parseResult = CSVParser.parse(data: csvData, maxRows: maxPreviewRows, maxColumns: maxPreviewColumns)
+  46 |                 if let w = parseResult.warning {
+  47 |                     alertTitle = "Preview warning"
+  48 |                     alertMessage = w
+  49 |                     showAlert = true
+  50 |                 }
+  51 |             }
+  52 |             .alert(alertTitle, isPresented: $showAlert) {
+  53 |                 Button("OK", role: .cancel) { }
+  54 |             } message: {
+  55 |                 Text(alertMessage ?? "Unknown error")
+  56 |             }
+  57 |         }
+  58 |     }
+  59 | 
+  60 |     private var previewBody: some View {
+  61 |         List {
+  62 |             Section("File") {
+  63 |                 HStack {
+  64 |                     Text("Name")
+  65 |                     Spacer()
+  66 |                     Text(filename ?? "CSV")
+  67 |                         .foregroundStyle(.secondary)
+  68 |                 }
+  69 |                 HStack {
+  70 |                     Text("Rows shown")
+  71 |                     Spacer()
+  72 |                     Text("\(max(0, parseResult.rows.count - (parseResult.hasHeader ? 1 : 0)))")
+  73 |                         .foregroundStyle(.secondary)
+  74 |                 }
+  75 |                 HStack {
+  76 |                     Text("Columns shown")
+  77 |                     Spacer()
+  78 |                     Text("\(parseResult.columnCount)")
+  79 |                         .foregroundStyle(.secondary)
+  80 |                 }
+  81 |                 HStack {
+  82 |                     Text("Header row")
+  83 |                     Spacer()
+  84 |                     Text(parseResult.hasHeader ? "Yes" : "No")
+  85 |                         .foregroundStyle(.secondary)
+  86 |                 }
+  87 |             }
+  88 | 
+  89 |             if parseResult.hasHeader, let header = parseResult.rows.first {
+  90 |                 Section("Headers") {
+  91 |                     ForEach(Array(header.prefix(parseResult.columnCount)).indices, id: \.self) { idx in
+  92 |                         Text(header[idx].isEmpty ? "(blank)" : header[idx])
+  93 |                     }
+  94 |                 }
+  95 |             }
+  96 | 
+  97 |             Section("Preview") {
+  98 |                 let startIndex = parseResult.hasHeader ? 1 : 0
+  99 |                 let displayRows = Array(parseResult.rows.dropFirst(startIndex))
+ 100 | 
+ 101 |                 ForEach(displayRows.indices, id: \.self) { r in
+ 102 |                     VStack(alignment: .leading, spacing: 6) {
+ 103 |                         Text("Row \(r + 1)")
+ 104 |                             .font(.subheadline)
+ 105 |                             .bold()
+ 106 | 
+ 107 |                         let row = displayRows[r]
+ 108 |                         ForEach(0..<parseResult.columnCount, id: \.self) { c in
+ 109 |                             let value = c < row.count ? row[c] : ""
+ 110 |                             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+ 111 |                             if !trimmed.isEmpty {
+ 112 |                                 Text(trimmed)
+ 113 |                                     .font(.footnote)
+ 114 |                                     .foregroundStyle(.secondary)
+ 115 |                                     .lineLimit(2)
+ 116 |                             }
+ 117 |                         }
+ 118 |                     }
+ 119 |                     .padding(.vertical, 4)
+ 120 |                 }
+ 121 |             }
+ 122 |         }
+ 123 |     }
+ 124 | 
+ 125 |     private func importNow() {
+ 126 |         isImporting = true
+ 127 |         defer { isImporting = false }
+ 128 | 
+ 129 |         do {
+ 130 |             let r = try GameCatalogCSVImporter.importCSV(context: context, csvData: csvData)
+ 131 |             alertTitle = "Import complete"
+ 132 |             alertMessage = "Imported/updated \(r.insertedOrUpdated). Skipped \(r.skipped). Removed \(r.removed)."
+ 133 |             showAlert = true
+ 134 |         } catch {
+ 135 |             alertTitle = "Import failed"
+ 136 |             alertMessage = error.localizedDescription
+ 137 |             showAlert = true
+ 138 |         }
+ 139 |     }
+ 140 | }
+ 141 | 
+ 142 | // MARK: - Lightweight CSV Parser (preview only)
+ 143 | 
+ 144 | private enum CSVParser {
+ 145 |     static func parse(data: Data, maxRows: Int, maxColumns: Int) -> ParseResult {
+ 146 |         guard let s = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+ 147 |             return .init(rows: [], columnCount: 0, hasHeader: false, warning: "Could not decode file as UTF-8/Latin1.")
+ 148 |         }
+ 149 | 
+ 150 |         let normalized = s.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+ 151 |         let lines = normalized.split(separator: "\n", omittingEmptySubsequences: true)
+ 152 | 
+ 153 |         var rows: [[String]] = []
+ 154 |         rows.reserveCapacity(min(lines.count, maxRows + 1))
+ 155 | 
+ 156 |         for line in lines.prefix(maxRows + 1) {
+ 157 |             rows.append(parseLine(String(line)))
+ 158 |         }
+ 159 | 
+ 160 |         let columnCount = min(maxColumns, rows.map { $0.count }.max() ?? 0)
+ 161 |         let hasHeader = inferHeader(rows.first)
+ 162 | 
+ 163 |         var warning: String? = nil
+ 164 |         if columnCount == 0 {
+ 165 |             warning = "No columns detected. Check delimiter/format."
+ 166 |         } else if lines.count > maxRows + 1 {
+ 167 |             warning = "Preview is limited to the first \(maxRows) data rows."
+ 168 |         }
+ 169 | 
+ 170 |         return .init(rows: rows, columnCount: columnCount, hasHeader: hasHeader, warning: warning)
+ 171 |     }
+ 172 | 
+ 173 |     private static func parseLine(_ line: String) -> [String] {
+ 174 |         var result: [String] = []
+ 175 |         var current = ""
+ 176 |         var inQuotes = false
+ 177 |         var i = line.startIndex
+ 178 | 
+ 179 |         while i < line.endIndex {
+ 180 |             let ch = line[i]
+ 181 | 
+ 182 |             if ch == "\"" {
+ 183 |                 let next = line.index(after: i)
+ 184 |                 if inQuotes, next < line.endIndex, line[next] == "\"" {
+ 185 |                     current.append("\"")
+ 186 |                     i = line.index(after: next)
+ 187 |                     continue
+ 188 |                 } else {
+ 189 |                     inQuotes.toggle()
+ 190 |                     i = line.index(after: i)
+ 191 |                     continue
+ 192 |                 }
+ 193 |             }
+ 194 | 
+ 195 |             if ch == "," && !inQuotes {
+ 196 |                 result.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+ 197 |                 current = ""
+ 198 |                 i = line.index(after: i)
+ 199 |                 continue
+ 200 |             }
+ 201 | 
+ 202 |             current.append(ch)
+ 203 |             i = line.index(after: i)
+ 204 |         }
+ 205 | 
+ 206 |         result.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+ 207 |         return result
+ 208 |     }
+ 209 | 
+ 210 |     private static func inferHeader(_ firstRow: [String]?) -> Bool {
+ 211 |         guard let row = firstRow, !row.isEmpty else { return false }
+ 212 |         let sample = row.prefix(10)
+ 213 |         let nonEmpty = sample.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+ 214 |         guard !nonEmpty.isEmpty else { return false }
+ 215 | 
+ 216 |         let nonNumericCount = nonEmpty.filter { Double($0) == nil }.count
+ 217 |         return Double(nonNumericCount) / Double(nonEmpty.count) >= 0.7
+ 218 |     }
+ 219 | }
+ 220 | 
+ 221 | private struct ParseResult {
+ 222 |     let rows: [[String]]
+ 223 |     let columnCount: Int
+ 224 |     let hasHeader: Bool
+ 225 |     let warning: String?
+ 226 | 
+ 227 |     static let empty = ParseResult(rows: [], columnCount: 0, hasHeader: false, warning: nil)
+ 228 | }
+
+
+END FILE: ./CSVImportPreviewSheet.swift
+
+
+################################################################################
+START FILE: ./FairnessEngine.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | final class FairnessEngine {
+   5 | 
+   6 |     private let context: ModelContext
+   7 | 
+   8 |     init(context: ModelContext) {
+   9 |         self.context = context
+  10 |     }
+  11 | 
+  12 |     func generateTeams(for round: Round, in event: Event) throws -> [RoundTeam] {
+  13 | 
+  14 |         guard let eventGame = round.eventGame else {
+  15 |             throw FairnessError.missingEventGame
+  16 |         }
+  17 | 
+  18 |         let settings = try effectiveSettings(for: eventGame)
+  19 | 
+  20 |         let eligiblePeople = try fetchEligiblePeople(for: event)
+  21 |         let required = settings.teamCount * settings.playersPerTeam
+  22 | 
+  23 |         guard eligiblePeople.count >= required else {
+  24 |             throw FairnessError.notEnoughPlayers(required: required, available: eligiblePeople.count)
+  25 |         }
+  26 | 
+  27 |         // Choose participants for this round based on "equal playing time" = rounds played (completed rounds)
+  28 |         let chosen = chooseParticipants(
+  29 |             eligible: eligiblePeople,
+  30 |             required: required,
+  31 |             event: event
+  32 |         )
+  33 | 
+  34 |         if settings.teamType == .couplesOnly {
+  35 |             return try generateCouplesOnlyTeams(teamCount: settings.teamCount, eligible: chosen)
+  36 |         }
+  37 | 
+  38 |         // Generate candidate partitions and pick best by score
+  39 |         let historySignatures = matchupSignaturesForGame(eventGame: eventGame)
+  40 | 
+  41 |         let candidates = 600
+  42 |         var best: [RoundTeam] = []
+  43 |         var bestScore = Double.greatestFiniteMagnitude
+  44 | 
+  45 |         for _ in 0..<candidates {
+  46 |             let shuffled = chosen.shuffled().map { $0.id }
+  47 |             let teams = partition(ids: shuffled, teamCount: settings.teamCount, playersPerTeam: settings.playersPerTeam)
+  48 | 
+  49 |             let score = scoreTeams(
+  50 |                 teams: teams,
+  51 |                 peopleById: Dictionary(uniqueKeysWithValues: chosen.map { ($0.id, $0) }),
+  52 |                 historySignatures: historySignatures,
+  53 |                 allowSpousesSameTeam: false // unless couplesOnly
+  54 |             )
+  55 | 
+  56 |             if score < bestScore {
+  57 |                 bestScore = score
+  58 |                 best = teams
+  59 |                 if score == 0 { break }
+  60 |             }
+  61 |         }
+  62 | 
+  63 |         return best
+  64 |     }
+  65 | 
+  66 |     // MARK: - Settings
+  67 | 
+  68 |     private struct Settings {
+  69 |         let teamCount: Int
+  70 |         let playersPerTeam: Int
+  71 |         let teamType: TeamType
+  72 |     }
+  73 | 
+  74 |     private func effectiveSettings(for eventGame: EventGame) throws -> Settings {
+  75 |         // Resolve template to get defaults
+  76 |         let t = try fetchTemplate(id: eventGame.gameTemplateId)
+  77 | 
+  78 |         let teamCount = eventGame.overrideTeamCount ?? t?.defaultTeamCount ?? 2
+  79 |         let playersPerTeam = eventGame.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam ?? 2
+  80 |         let teamType = eventGame.overrideTeamType ?? t?.defaultTeamType ?? .any
+  81 | 
+  82 |         return Settings(teamCount: max(1, teamCount), playersPerTeam: max(1, playersPerTeam), teamType: teamType)
+  83 |     }
+  84 | 
+  85 |     // MARK: - Participant choice (equal playing time by rounds played)
+  86 | 
+  87 |     private func chooseParticipants(eligible: [Person], required: Int, event: Event) -> [Person] {
+  88 |         let playedCounts = roundsPlayedCounts(event: event)
+  89 |         return eligible
+  90 |             .sorted {
+  91 |                 let a = playedCounts[$0.id, default: 0]
+  92 |                 let b = playedCounts[$1.id, default: 0]
+  93 |                 if a != b { return a < b }
+  94 |                 return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+  95 |             }
+  96 |             .prefix(required)
+  97 |             .map { $0 }
+  98 |     }
+  99 | 
+ 100 |     private func roundsPlayedCounts(event: Event) -> [UUID: Int] {
+ 101 |         var counts: [UUID: Int] = [:]
+ 102 |         for eg in event.eventGames {
+ 103 |             for r in eg.rounds where r.completedAt != nil {
+ 104 |                 for team in r.teams {
+ 105 |                     for pid in team.memberPersonIds {
+ 106 |                         counts[pid, default: 0] += 1
+ 107 |                     }
+ 108 |                 }
+ 109 |             }
+ 110 |         }
+ 111 |         return counts
+ 112 |     }
+ 113 | 
+ 114 |     // MARK: - Matchup signature (head-to-head)
+ 115 | 
+ 116 |     private func matchupSignaturesForGame(eventGame: EventGame) -> Set<String> {
+ 117 |         var s = Set<String>()
+ 118 |         for r in eventGame.rounds where r.completedAt != nil {
+ 119 |             let sig = matchupSignature(teams: r.teams)
+ 120 |             s.insert(sig)
+ 121 |         }
+ 122 |         return s
+ 123 |     }
+ 124 | 
+ 125 |     private func matchupSignature(teams: [RoundTeam]) -> String {
+ 126 |         let normalizedTeams = teams
+ 127 |             .map { $0.memberPersonIds.sorted(by: { $0.uuidString < $1.uuidString }) }
+ 128 |             .sorted { left, right in
+ 129 |                 left.map(\.uuidString).joined(separator: ",") < right.map(\.uuidString).joined(separator: ",")
+ 130 |             }
+ 131 |         return normalizedTeams
+ 132 |             .map { $0.map(\.uuidString).joined(separator: ",") }
+ 133 |             .joined(separator: "||")
+ 134 |     }
+ 135 | 
+ 136 |     // MARK: - Scoring
+ 137 | 
+ 138 |     private func scoreTeams(
+ 139 |         teams: [RoundTeam],
+ 140 |         peopleById: [UUID: Person],
+ 141 |         historySignatures: Set<String>,
+ 142 |         allowSpousesSameTeam: Bool
+ 143 |     ) -> Double {
+ 144 | 
+ 145 |         var score: Double = 0
+ 146 | 
+ 147 |         // 1) Prevent repeating the exact head-to-head matchup (B)
+ 148 |         let sig = matchupSignature(teams: teams)
+ 149 |         if historySignatures.contains(sig) {
+ 150 |             score += 10_000
+ 151 |         }
+ 152 | 
+ 153 |         // 2) Spouse constraint (unless couplesOnly)
+ 154 |         if !allowSpousesSameTeam {
+ 155 |             for team in teams {
+ 156 |                 let ids = Set(team.memberPersonIds)
+ 157 |                 for pid in ids {
+ 158 |                     if let spouseId = peopleById[pid]?.spouseId, ids.contains(spouseId) {
+ 159 |                         score += 5_000
+ 160 |                     }
+ 161 |                 }
+ 162 |             }
+ 163 |         }
+ 164 | 
+ 165 |         // 3) Balance by athleticAbility / weight / age (if available)
+ 166 |         // Penalty based on variance between team totals.
+ 167 |         func teamStat(_ team: RoundTeam, get: (Person) -> Int?) -> Double {
+ 168 |             let vals = team.memberPersonIds.compactMap { peopleById[$0] }.compactMap(get)
+ 169 |             if vals.isEmpty { return 0 }
+ 170 |             return Double(vals.reduce(0, +))
+ 171 |         }
+ 172 | 
+ 173 |         let athletic = teams.map { teamStat($0) { $0.athleticAbility } }
+ 174 |         let weight = teams.map { teamStat($0) { $0.weight } }
+ 175 |         let age = teams.map { teamStat($0) { $0.age } }
+ 176 | 
+ 177 |         score += variancePenalty(athletic) * 2.0
+ 178 |         score += variancePenalty(weight) * 0.25
+ 179 |         score += variancePenalty(age) * 0.5
+ 180 | 
+ 181 |         return score
+ 182 |     }
+ 183 | 
+ 184 |     private func variancePenalty(_ values: [Double]) -> Double {
+ 185 |         guard values.count > 1 else { return 0 }
+ 186 |         let mean = values.reduce(0, +) / Double(values.count)
+ 187 |         let varSum = values.reduce(0) { $0 + pow($1 - mean, 2) }
+ 188 |         return varSum
+ 189 |     }
+ 190 | 
+ 191 |     // MARK: - Couples-only teams
+ 192 | 
+ 193 |     private func generateCouplesOnlyTeams(teamCount: Int, eligible: [Person]) throws -> [RoundTeam] {
+ 194 | 
+ 195 |         let byId = Dictionary(uniqueKeysWithValues: eligible.map { ($0.id, $0) })
+ 196 | 
+ 197 |         var used = Set<UUID>()
+ 198 |         var pairs: [[UUID]] = []
+ 199 | 
+ 200 |         for person in eligible {
+ 201 |             guard !used.contains(person.id),
+ 202 |                   let spouseId = person.spouseId,
+ 203 |                   let spouse = byId[spouseId],
+ 204 |                   spouse.spouseId == person.id,
+ 205 |                   !used.contains(spouse.id)
+ 206 |             else { continue }
+ 207 | 
+ 208 |             used.insert(person.id)
+ 209 |             used.insert(spouse.id)
+ 210 |             pairs.append([person.id, spouse.id])
+ 211 |         }
+ 212 | 
+ 213 |         guard pairs.count >= teamCount else {
+ 214 |             throw FairnessError.notEnoughCouples(required: teamCount, available: pairs.count)
+ 215 |         }
+ 216 | 
+ 217 |         return pairs.prefix(teamCount).map { RoundTeam(memberPersonIds: $0) }
+ 218 |     }
+ 219 | 
+ 220 |     // MARK: - Utilities
+ 221 | 
+ 222 |     private func partition(ids: [UUID], teamCount: Int, playersPerTeam: Int) -> [RoundTeam] {
+ 223 |         var result: [RoundTeam] = []
+ 224 |         var index = 0
+ 225 |         for _ in 0..<teamCount {
+ 226 |             let slice = ids[index..<(index + playersPerTeam)]
+ 227 |             result.append(RoundTeam(memberPersonIds: Array(slice)))
+ 228 |             index += playersPerTeam
+ 229 |         }
+ 230 |         return result
+ 231 |     }
+ 232 | 
+ 233 |     private func fetchEligiblePeople(for event: Event) throws -> [Person] {
+ 234 |         let all = try context.fetch(FetchDescriptor<Person>())
+ 235 |         let idSet = Set(event.participantIds)
+ 236 |         return all.filter { $0.isActive && idSet.contains($0.id) }
+ 237 |     }
+ 238 | 
+ 239 |     private func fetchTemplate(id: UUID) throws -> GameTemplate? {
+ 240 |         let d = FetchDescriptor<GameTemplate>(predicate: #Predicate { $0.id == id })
+ 241 |         return try context.fetch(d).first
+ 242 |     }
+ 243 | }
+ 244 | 
+ 245 | // MARK: - Errors
+ 246 | 
+ 247 | enum FairnessError: LocalizedError {
+ 248 |     case missingEventGame
+ 249 |     case notEnoughPlayers(required: Int, available: Int)
+ 250 |     case notEnoughCouples(required: Int, available: Int)
+ 251 | 
+ 252 |     var errorDescription: String? {
+ 253 |         switch self {
+ 254 |         case .missingEventGame:
+ 255 |             return "Round is not attached to an EventGame."
+ 256 |         case .notEnoughPlayers(let r, let a):
+ 257 |             return "Not enough players. Required \(r), available \(a)."
+ 258 |         case .notEnoughCouples(let r, let a):
+ 259 |             return "Not enough couples. Required \(r), available \(a)."
+ 260 |         }
+ 261 |     }
+ 262 | }
+
+
+END FILE: ./FairnessEngine.swift
+
+
+################################################################################
+START FILE: ./FilesHelper.swift
+################################################################################
+   1 | import Foundation
+   2 | import UIKit
+   3 | 
+   4 | enum FilesHelper {
+   5 | 
+   6 |     static func openAppFolder() {
+   7 |         guard let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+   8 |             return
+   9 |         }
+  10 | 
+  11 |         UIApplication.shared.open(url)
+  12 |     }
+  13 | 
+  14 |     static func ensureGamesFolderExists() {
+  15 |         guard let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+  16 |             return
+  17 |         }
+  18 | 
+  19 |         let folder = docs.appendingPathComponent("Christmas Games", isDirectory: true)
+  20 | 
+  21 |         if !FileManager.default.fileExists(atPath: folder.path) {
+  22 |             try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+  23 |         }
+  24 |     }
+  25 | }
+
+
+END FILE: ./FilesHelper.swift
+
+
+################################################################################
+START FILE: ./GameTemplateSheet.swift
+################################################################################
+   1 | import SwiftUI
+   2 | import SwiftData
+   3 | 
+   4 | struct CreateGameTemplateSheet: View {
+   5 |     @Environment(\.dismiss) private var dismiss
+   6 |     @Environment(\.modelContext) private var context
+   7 | 
+   8 |     let onCreated: (GameTemplate) -> Void
+   9 | 
+  10 |     @State private var name = ""
+  11 |     @State private var groupName = ""
+  12 |     @State private var defaultTeamCount = 2
+  13 |     @State private var defaultPlayersPerTeam = 2
+  14 |     @State private var defaultRoundsPerGame = 1
+  15 |     @State private var teamType: TeamType = .any
+  16 |     @State private var instructions = ""
+  17 | 
+  18 |     var body: some View {
+  19 |         NavigationStack {
+  20 |             Form {
+  21 |                 Section("Basic") {
+  22 |                     TextField("Name", text: $name)
+  23 |                     TextField("Group (optional)", text: $groupName)
+  24 |                 }
+  25 | 
+  26 |                 Section("Defaults") {
+  27 |                     Stepper("Teams: \(defaultTeamCount)", value: $defaultTeamCount, in: 1...20)
+  28 |                     Stepper("Players per Team: \(defaultPlayersPerTeam)", value: $defaultPlayersPerTeam, in: 1...20)
+  29 |                     Stepper("Rounds: \(defaultRoundsPerGame)", value: $defaultRoundsPerGame, in: 1...50)
+  30 | 
+  31 |                     Picker("Team Type", selection: $teamType) {
+  32 |                         Text("Any").tag(TeamType.any)
+  33 |                         Text("Male Only").tag(TeamType.maleOnly)
+  34 |                         Text("Female Only").tag(TeamType.femaleOnly)
+  35 |                         Text("Couples Only").tag(TeamType.couplesOnly)
+  36 |                     }
+  37 |                 }
+  38 | 
+  39 |                 Section("Instructions") {
+  40 |                     TextField("Instructions (optional)", text: $instructions, axis: .vertical)
+  41 |                         .lineLimit(3...8)
+  42 |                 }
+  43 |             }
+  44 |             .navigationTitle("New Game Template")
+  45 |             .toolbar {
+  46 |                 ToolbarItem(placement: .topBarLeading) {
+  47 |                     Button("Cancel") { dismiss() }
+  48 |                 }
+  49 | 
+  50 |                 ToolbarItem(placement: .topBarTrailing) {
+  51 |                     Button("Save") { save() }
+  52 |                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+  53 |                 }
+  54 |             }
+  55 |         }
+  56 |     }
+  57 | 
+  58 |     private func save() {
+  59 |         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+  60 |         guard !trimmedName.isEmpty else { return }
+  61 | 
+  62 |         let template = GameTemplate(
+  63 |             externalId: "user_\(UUID().uuidString.lowercased())",
+  64 |             name: trimmedName,
+  65 |             groupName: groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : groupName,
+  66 |             defaultTeamCount: defaultTeamCount,
+  67 |             defaultPlayersPerTeam: defaultPlayersPerTeam,
+  68 |             defaultRoundsPerGame: defaultRoundsPerGame,
+  69 |             defaultTeamType: teamType,
+  70 |             instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : instructions
+  71 |         )
+  72 | 
+  73 |         context.insert(template)
+  74 |         try? context.save()
+  75 | 
+  76 |         onCreated(template)
+  77 |         dismiss()
+  78 |     }
+  79 | }
+
+
+END FILE: ./GameTemplateSheet.swift
+
+
+################################################################################
+START FILE: ./GameCatelogExporter.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | @MainActor
+   5 | enum GameCatalogExporter {
+   6 | 
+   7 |     static func exportToDocuments(
+   8 |         context: ModelContext,
+   9 |         filename: String = "games",
+  10 |         fileExtension: String = "json"
+  11 |     ) throws -> URL {
+  12 | 
+  13 |         let templates = try context.fetch(FetchDescriptor<GameTemplate>())
+  14 | 
+  15 |         let games: [ExportGameCatalogGame] = templates
+  16 |             .map { t in
+  17 |                 ExportGameCatalogGame(
+  18 |                     externalId: t.externalId,
+  19 |                     name: t.name,
+  20 |                     groupName: t.groupName,
+  21 |                     defaultTeamCount: t.defaultTeamCount,
+  22 |                     defaultPlayersPerTeam: t.defaultPlayersPerTeam,
+  23 |                     defaultRoundsPerGame: t.defaultRoundsPerGame,
+  24 |                     teamType: t.defaultTeamType,
+  25 |                     instructions: t.instructions
+  26 |                 )
+  27 |             }
+  28 |             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+  29 | 
+  30 |         let catalog = ExportGameCatalog(games: games)
+  31 | 
+  32 |         let data = try JSONEncoder().encode(catalog)
+  33 | 
+  34 |         let url = try documentsURL(filename: filename, fileExtension: fileExtension)
+  35 |         try data.write(to: url, options: [.atomic])
+  36 | 
+  37 |         return url
+  38 |     }
+  39 | 
+  40 |     private static func documentsURL(filename: String, fileExtension: String) throws -> URL {
+  41 |         let dir = try FileManager.default.url(
+  42 |             for: .documentDirectory,
+  43 |             in: .userDomainMask,
+  44 |             appropriateFor: nil,
+  45 |             create: true
+  46 |         )
+  47 |         return dir.appendingPathComponent("\(filename).\(fileExtension)")
+  48 |     }
+  49 | }
+  50 | 
+  51 | // MARK: - Private JSON DTOs (scoped to exporter)
+  52 | 
+  53 | private struct ExportGameCatalog: Codable {
+  54 |     let games: [ExportGameCatalogGame]
+  55 | }
+  56 | 
+  57 | private struct ExportGameCatalogGame: Codable {
+  58 |     let externalId: String
+  59 |     let name: String
+  60 |     let groupName: String?
+  61 |     let defaultTeamCount: Int
+  62 |     let defaultPlayersPerTeam: Int
+  63 |     let defaultRoundsPerGame: Int
+  64 |     let teamType: TeamType
+  65 |     let instructions: String?
+  66 | }
+
+
+END FILE: ./GameCatelogExporter.swift
+
+
+################################################################################
+START FILE: ./GameCatalogImporter.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | @MainActor
+   5 | enum GameCatalogImporter {
+   6 | 
+   7 |     // MARK: - Public API (matches your BootstrapView calls)
+   8 | 
+   9 |     /// Imports games.json from Documents *if present*.
+  10 |     /// Returns the number of templates imported/updated, or nil if the file doesn't exist.
+  11 |     static func importFromDocumentsIfPresent(
+  12 |         context: ModelContext,
+  13 |         filename: String,
+  14 |         fileExtension: String
+  15 |     ) throws -> Int? {
+  16 |         let url = documentsURL(filename: filename, fileExtension: fileExtension)
+  17 | 
+  18 |         guard FileManager.default.fileExists(atPath: url.path) else {
+  19 |             return nil
+  20 |         }
+  21 | 
+  22 |         let data = try Data(contentsOf: url)
+  23 |         let count = try importFromData(context: context, jsonData: data)
+  24 |         return count
+  25 |     }
+  26 | 
+  27 |     /// Imports games.json from the app bundle.
+  28 |     /// Returns the number of templates imported/updated.
+  29 |     static func importFromBundle(
+  30 |         context: ModelContext,
+  31 |         filename: String,
+  32 |         fileExtension: String
+  33 |     ) throws -> Int {
+  34 |         guard let url = Bundle.main.url(forResource: filename, withExtension: fileExtension) else {
+  35 |             return 0 // treat missing bundled json as "no seed"
+  36 |         }
+  37 | 
+  38 |         let data = try Data(contentsOf: url)
+  39 |         let count = try importFromData(context: context, jsonData: data)
+  40 |         return count
+  41 |     }
+  42 | 
+  43 |     // MARK: - Backward-compatible helpers (optional; safe to keep)
+  44 | 
+  45 |     static func importFromBundle(context: ModelContext) throws {
+  46 |         _ = try importFromBundle(context: context, filename: "games", fileExtension: "json")
+  47 |     }
+  48 | 
+  49 |     static func importFromDocuments(context: ModelContext) throws {
+  50 |         _ = try importFromDocumentsIfPresent(context: context, filename: "games", fileExtension: "json")
+  51 |     }
+  52 | 
+  53 |     // MARK: - Core import
+  54 | 
+  55 |     private static func importFromData(context: ModelContext, jsonData: Data) throws -> Int {
+  56 |         let decoder = JSONDecoder()
+  57 |         let catalog = try decoder.decode(GameCatalog.self, from: jsonData)
+  58 | 
+  59 |         var count = 0
+  60 |         for game in catalog.games {
+  61 |             try upsert(game: game, context: context)
+  62 |             count += 1
+  63 |         }
+  64 | 
+  65 |         try context.save()
+  66 |         return count
+  67 |     }
+  68 | 
+  69 |     private static func upsert(game: GameCatalogGame, context: ModelContext) throws {
+  70 |         let descriptor = FetchDescriptor<GameTemplate>(
+  71 |             predicate: #Predicate { $0.externalId == game.externalId }
+  72 |         )
+  73 | 
+  74 |         if let existing = try context.fetch(descriptor).first {
+  75 |             existing.name = game.name
+  76 |             existing.groupName = game.groupName
+  77 |             existing.defaultTeamCount = game.defaultTeamCount
+  78 |             existing.defaultPlayersPerTeam = game.defaultPlayersPerTeam
+  79 |             existing.defaultRoundsPerGame = game.defaultRoundsPerGame
+  80 |             existing.defaultTeamTypeRaw = game.teamType.rawValue
+  81 |             existing.instructions = game.instructions
+  82 |         } else {
+  83 |             let template = GameTemplate(
+  84 |                 externalId: game.externalId,
+  85 |                 name: game.name,
+  86 |                 groupName: game.groupName,
+  87 |                 defaultTeamCount: game.defaultTeamCount,
+  88 |                 defaultPlayersPerTeam: game.defaultPlayersPerTeam,
+  89 |                 defaultRoundsPerGame: game.defaultRoundsPerGame,
+  90 |                 defaultTeamType: game.teamType,
+  91 |                 instructions: game.instructions
+  92 |             )
+  93 |             context.insert(template)
+  94 |         }
+  95 |     }
+  96 | 
+  97 |     // MARK: - Paths
+  98 | 
+  99 |     private static func documentsURL(filename: String, fileExtension: String) -> URL {
+ 100 |         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+ 101 |             .appendingPathComponent("\(filename).\(fileExtension)")
+ 102 |     }
+ 103 | }
+ 104 | 
+ 105 | // MARK: - Private JSON DTOs (avoid redeclaration collisions)
+ 106 | 
+ 107 | private struct GameCatalog: Codable {
+ 108 |     let games: [GameCatalogGame]
+ 109 | }
+ 110 | 
+ 111 | private struct GameCatalogGame: Codable {
+ 112 |     let externalId: String
+ 113 |     let name: String
+ 114 |     let groupName: String?
+ 115 |     let defaultTeamCount: Int
+ 116 |     let defaultPlayersPerTeam: Int
+ 117 |     let defaultRoundsPerGame: Int
+ 118 |     let teamType: TeamType
+ 119 |     let instructions: String?
+ 120 | }
+
+
+END FILE: ./GameCatalogImporter.swift
+
+
+################################################################################
+START FILE: ./EventEngine.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | @MainActor
+   5 | final class EventEngine {
+   6 |     private let context: ModelContext
+   7 | 
+   8 |     init(context: ModelContext) {
+   9 |         self.context = context
+  10 |     }
+  11 | 
+  12 |     // MARK: - Participants
+  13 | 
+  14 |     func setParticipants(for event: Event, participantIds: [UUID]) throws {
+  15 |         event.participantIds = participantIds
+  16 |         touch(event)
+  17 |         try context.save()
+  18 |     }
+  19 | 
+  20 |     // MARK: - Event Games: Import / Add / Remove
+  21 | 
+  22 |     /// Imports all GameTemplate rows into the given Event as EventGame rows.
+  23 |     /// Idempotent: re-running does NOT create duplicates.
+  24 |     func importAllCatalogGames(into event: Event) throws {
+  25 |         let templates = try context.fetch(FetchDescriptor<GameTemplate>())
+  26 |         let existingTemplateIds = Set(event.eventGames.map { $0.gameTemplateId })
+  27 | 
+  28 |         let maxIndex = event.eventGames.map(\.orderIndex).max() ?? -1
+  29 |         var nextIndex = maxIndex + 1
+  30 | 
+  31 |         for template in templates {
+  32 |             guard !existingTemplateIds.contains(template.id) else { continue }
+  33 | 
+  34 |             let eg = EventGame(
+  35 |                 event: event,
+  36 |                 gameTemplateId: template.id,
+  37 |                 orderIndex: nextIndex
+  38 |             )
+  39 |             nextIndex += 1
+  40 | 
+  41 |             context.insert(eg)
+  42 |             event.eventGames.append(eg)
+  43 |         }
+  44 | 
+  45 |         touch(event)
+  46 |         try context.save()
+  47 |     }
+  48 | 
+  49 |     /// Adds a single template to the event (no duplicates).
+  50 |     func addGameTemplate(_ template: GameTemplate, to event: Event) throws {
+  51 |         let exists = event.eventGames.contains(where: { $0.gameTemplateId == template.id })
+  52 |         guard !exists else { return }
+  53 | 
+  54 |         let maxIndex = event.eventGames.map(\.orderIndex).max() ?? -1
+  55 |         let eg = EventGame(
+  56 |             event: event,
+  57 |             gameTemplateId: template.id,
+  58 |             orderIndex: maxIndex + 1
+  59 |         )
+  60 | 
+  61 |         context.insert(eg)
+  62 |         event.eventGames.append(eg)
+  63 | 
+  64 |         touch(event)
+  65 |         try context.save()
+  66 |     }
+  67 | 
+  68 |     /// Removes an EventGame from the event.
+  69 |     func removeEventGame(_ eventGame: EventGame, from event: Event) throws {
+  70 |         event.eventGames.removeAll(where: { $0.id == eventGame.id })
+  71 |         context.delete(eventGame)
+  72 | 
+  73 |         // If you removed the current game, clear pointer
+  74 |         if event.currentEventGameId == eventGame.id {
+  75 |             event.currentEventGameId = nil
+  76 |         }
+  77 | 
+  78 |         touch(event)
+  79 |         try context.save()
+  80 |     }
+  81 | 
+  82 |     // MARK: - Start / Progression
+  83 | 
+  84 |     // MARK: - Event Lifecycle (used by ContentView)
+  85 | 
+  86 |     func startEvent(_ event: Event) throws {
+  87 |         // Starting the event means: mark active and immediately start the next game.
+  88 |         guard !event.participantIds.isEmpty else { throw StartError.noParticipants }
+  89 | 
+  90 |         event.status = .active
+  91 | 
+  92 |         if let next = try pickNextGameRandom(event: event) {
+  93 |             try start(event: event, eventGame: next)
+  94 |         }
+  95 | 
+  96 |         touch(event)
+  97 |         try context.save()
+  98 |     }
+  99 | 
+ 100 |     func pauseEvent(_ event: Event) throws {
+ 101 |         event.status = .paused
+ 102 |         touch(event)
+ 103 |         try context.save()
+ 104 |     }
+ 105 | 
+ 106 |     func resumeEvent(_ event: Event) throws {
+ 107 |         guard !event.participantIds.isEmpty else { throw StartError.noParticipants }
+ 108 | 
+ 109 |         event.status = .active
+ 110 | 
+ 111 |         // If there is no current game (or it is completed), start the next game.
+ 112 |         let current = event.currentEventGameId.flatMap { id in
+ 113 |             event.eventGames.first(where: { $0.id == id })
+ 114 |         }
+ 115 | 
+ 116 |         if current == nil || current?.status == .completed {
+ 117 |             if let next = try pickNextGameRandom(event: event) {
+ 118 |                 try start(event: event, eventGame: next)
+ 119 |             } else {
+ 120 |                 event.status = .completed
+ 121 |                 event.currentEventGameId = nil
+ 122 |             }
+ 123 |         }
+ 124 | 
+ 125 |         touch(event)
+ 126 |         try context.save()
+ 127 |     }
+ 128 | 
+ 129 |     /// Starts a specific EventGame:
+ 130 |     /// - sets event active
+ 131 |     /// - sets currentEventGameId
+ 132 |     /// - sets game status to inProgress
+ 133 |     /// - creates round 0 if missing
+ 134 |     func start(event: Event, eventGame: EventGame) throws {
+ 135 |         // Must have participants to play
+ 136 |         guard !event.participantIds.isEmpty else {
+ 137 |             throw StartError.noParticipants
+ 138 |         }
+ 139 | 
+ 140 |         // Resolve template to know defaultRoundsPerGame
+ 141 |         guard let template = try fetchTemplate(id: eventGame.gameTemplateId) else {
+ 142 |             throw StartError.missingTemplate
+ 143 |         }
+ 144 | 
+ 145 |         event.status = .active
+ 146 |         event.currentEventGameId = eventGame.id
+ 147 |         eventGame.status = .inProgress
+ 148 | 
+ 149 |         // Create round 0 only if none exist
+ 150 |         if eventGame.rounds.isEmpty {
+ 151 |             let r = Round(eventGame: eventGame, roundIndex: 0, teams: [])
+ 152 |             context.insert(r)
+ 153 |             eventGame.rounds.append(r)
+ 154 |         }
+ 155 | 
+ 156 |         touch(event)
+ 157 |         try context.save()
+ 158 |     }
+ 159 | 
+ 160 |     // MARK: - Game / Round progression (used by ContentView)
+ 161 | 
+ 162 |     func createNextRound(for eventGame: EventGame) throws -> Round {
+ 163 |         let nextIndex = eventGame.rounds.map(\.roundIndex).max().map { $0 + 1 } ?? 0
+ 164 |         let r = Round(eventGame: eventGame, roundIndex: nextIndex, teams: [])
+ 165 |         context.insert(r)
+ 166 |         eventGame.rounds.append(r)
+ 167 | 
+ 168 |         if let event = eventGame.event {
+ 169 |             touch(event)
+ 170 |         }
+ 171 |         try context.save()
+ 172 |         return r
+ 173 |     }
+ 174 | 
+ 175 |     func completeGame(_ eventGame: EventGame) throws {
+ 176 |         eventGame.status = .completed
+ 177 |         if let event = eventGame.event {
+ 178 |             // If the completed game was current, clear pointer (next game will set it)
+ 179 |             if event.currentEventGameId == eventGame.id {
+ 180 |                 event.currentEventGameId = nil
+ 181 |             }
+ 182 |             touch(event)
+ 183 |         }
+ 184 |         try context.save()
+ 185 |     }
+ 186 | 
+ 187 |     func pickNextGameRandom(event: Event) throws -> EventGame? {
+ 188 |         let remaining = event.eventGames.filter { $0.status == .notStarted }
+ 189 |         guard !remaining.isEmpty else { return nil }
+ 190 | 
+ 191 |         // Simple variety heuristic: prefer a different group than the last completed game.
+ 192 |         let templates = try context.fetch(FetchDescriptor<GameTemplate>())
+ 193 |         let templateById = Dictionary(uniqueKeysWithValues: templates.map { ($0.id, $0) })
+ 194 | 
+ 195 |         let lastCompleted = event.eventGames
+ 196 |             .filter { $0.status == .completed }
+ 197 |             .sorted { ($0.orderIndex) > ($1.orderIndex) }
+ 198 |             .first
+ 199 | 
+ 200 |         let lastGroup = lastCompleted.flatMap { templateById[$0.gameTemplateId]?.groupName?.trimmingCharacters(in: .whitespacesAndNewlines) }
+ 201 | 
+ 202 |         if let lastGroup, !lastGroup.isEmpty {
+ 203 |             let differentGroup = remaining.filter {
+ 204 |                 let g = templateById[$0.gameTemplateId]?.groupName?.trimmingCharacters(in: .whitespacesAndNewlines)
+ 205 |                 return (g?.isEmpty == false) ? (g != lastGroup) : true
+ 206 |             }
+ 207 |             if let pick = differentGroup.randomElement() {
+ 208 |                 return pick
+ 209 |             }
+ 210 |         }
+ 211 | 
+ 212 |         return remaining.randomElement()
+ 213 |     }
+ 214 | 
+ 215 |     func pushGameToLater(_ eventGame: EventGame) throws {
+ 216 |         guard let event = eventGame.event else { return }
+ 217 |         let maxIndex = event.eventGames.map(\.orderIndex).max() ?? -1
+ 218 |         eventGame.orderIndex = maxIndex + 1
+ 219 |         touch(event)
+ 220 |         try context.save()
+ 221 |     }
+ 222 | 
+ 223 |     func removeGameFromEvent(_ eventGame: EventGame) throws {
+ 224 |         guard let event = eventGame.event else {
+ 225 |             context.delete(eventGame)
+ 226 |             try context.save()
+ 227 |             return
+ 228 |         }
+ 229 |         event.eventGames.removeAll(where: { $0.id == eventGame.id })
+ 230 |         context.delete(eventGame)
+ 231 |         if event.currentEventGameId == eventGame.id {
+ 232 |             event.currentEventGameId = nil
+ 233 |         }
+ 234 |         touch(event)
+ 235 |         try context.save()
+ 236 |     }
+ 237 | 
+ 238 |     // MARK: - Teams / Rounds
+ 239 | 
+ 240 |     func generateTeams(for round: Round) throws {
+ 241 |         guard let eventGame = round.eventGame, let event = eventGame.event else { return }
+ 242 | 
+ 243 |         let fairness = FairnessEngine(context: context)
+ 244 |         let teams = try fairness.generateTeams(for: round, in: event)
+ 245 | 
+ 246 |         round.teams = teams
+ 247 |         touch(event)
+ 248 |         try context.save()
+ 249 |     }
+ 250 | 
+ 251 |     func swapPlayer(in round: Round, from outgoing: UUID, to incoming: UUID) throws {
+ 252 |         var updated = round.teams
+ 253 |         guard let teamIndex = updated.firstIndex(where: { $0.memberPersonIds.contains(outgoing) }) else { return }
+ 254 | 
+ 255 |         var team = updated[teamIndex]
+ 256 |         team.memberPersonIds = team.memberPersonIds.map { $0 == outgoing ? incoming : $0 }
+ 257 |         updated[teamIndex] = team
+ 258 |         round.teams = updated
+ 259 | 
+ 260 |         if let event = round.eventGame?.event {
+ 261 |             touch(event)
+ 262 |         }
+ 263 |         try context.save()
+ 264 |     }
+ 265 | 
+ 266 |     func finalizeRound(_ round: Round, winnerTeamId: UUID?) throws {
+ 267 |         round.completedAt = Date()
+ 268 | 
+ 269 |         if let winnerTeamId {
+ 270 |             round.resultType = .win
+ 271 |             round.winningTeamId = winnerTeamId
+ 272 |         } else {
+ 273 |             round.resultType = .tie
+ 274 |             round.winningTeamId = nil
+ 275 |         }
+ 276 | 
+ 277 |         if let event = round.eventGame?.event {
+ 278 |             touch(event)
+ 279 |         }
+ 280 |         try context.save()
+ 281 |     }
+ 282 | 
+ 283 |     // MARK: - Helpers
+ 284 | 
+ 285 |     private func fetchTemplate(id: UUID) throws -> GameTemplate? {
+ 286 |         let d = FetchDescriptor<GameTemplate>(predicate: #Predicate { $0.id == id })
+ 287 |         return try context.fetch(d).first
+ 288 |     }
+ 289 | 
+ 290 |     private func touch(_ event: Event) {
+ 291 |         event.lastModifiedAt = Date()
+ 292 |     }
+ 293 | 
+ 294 |     enum StartError: LocalizedError {
+ 295 |         case noParticipants
+ 296 |         case missingTemplate
+ 297 |         case invalidRoundCount
+ 298 | 
+ 299 |         var errorDescription: String? {
+ 300 |             switch self {
+ 301 |             case .noParticipants:
+ 302 |                 return "No players selected for this event. Add players before starting a game."
+ 303 |             case .missingTemplate:
+ 304 |                 return "The selected game template could not be found in the catalog."
+ 305 |             case .invalidRoundCount:
+ 306 |                 return "This game has an invalid number of rounds."
+ 307 |             }
+ 308 |         }
+ 309 |     }
+ 310 | }
+
+
+END FILE: ./EventEngine.swift
+
+
+################################################################################
+START FILE: ./Christmas_GamesApp.swift
+################################################################################
+   1 | import SwiftUI
+   2 | import SwiftData
+   3 | 
+   4 | @main
+   5 | struct Christmas_GamesApp: App {
+   6 | 
+   7 |     private var sharedModelContainer: ModelContainer = {
+   8 |         let schema = Schema([
+   9 |             Person.self,
+  10 |             GameTemplate.self,
+  11 |             Event.self,
+  12 |             EventGame.self,
+  13 |             Round.self
+  14 |         ])
+  15 | 
+  16 |         // Put the store in Documents/Christmas Games so it’s easy to find/remove if needed
+  17 |         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+  18 |         let folder = docs.appendingPathComponent("Christmas Games", isDirectory: true)
+  19 |         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+  20 | 
+  21 |         // Bump this suffix any time you change SwiftData @Model storage in a non-migrating project
+  22 |         let storeURL = folder.appendingPathComponent("ChristmasGames_v2.store")
+  23 | 
+  24 |         let configuration = ModelConfiguration(schema: schema, url: storeURL)
+  25 | 
+  26 |         do {
+  27 |             return try ModelContainer(for: schema, configurations: [configuration])
+  28 |         } catch {
+  29 |             fatalError("Failed to create ModelContainer: \(error)")
+  30 |         }
+  31 |     }()
+  32 | 
+  33 |     var body: some Scene {
+  34 |         WindowGroup {
+  35 |             ContentView()
+  36 |         }
+  37 |         .modelContainer(sharedModelContainer)
+  38 |     }
+  39 | }
+
+
+END FILE: ./Christmas_GamesApp.swift
+
+
+################################################################################
+START FILE: ./SeedData.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | enum SeedData {
+   5 | 
+   6 |     /// Upserts the full roster and removes legacy placeholders.
+   7 |     /// Safe to run multiple times.
+   8 |     @MainActor
+   9 |     static func seedOrUpdateRoster(context: ModelContext) throws {
+  10 | 
+  11 |         // Fetch all existing people
+  12 |         let existing = try context.fetch(FetchDescriptor<Person>())
+  13 |         var byName: [String: Person] =
+  14 |             Dictionary(uniqueKeysWithValues: existing.map { ($0.displayName, $0) })
+  15 | 
+  16 |         // MARK: - Remove legacy placeholder people
+  17 |         let legacyNamesToDelete: Set<String> = ["Couple2-A", "Couple2-B"]
+  18 |         for person in existing where legacyNamesToDelete.contains(person.displayName) {
+  19 |             context.delete(person)
+  20 |             byName[person.displayName] = nil
+  21 |         }
+  22 | 
+  23 |         // MARK: - Upsert helper
+  24 |         @discardableResult
+  25 |         func upsert(
+  26 |             _ name: String,
+  27 |             sex: String,
+  28 |             age: Int,
+  29 |             weight: Int,
+  30 |             athleticAbility: Int,
+  31 |             height: String
+  32 |         ) -> Person {
+  33 | 
+  34 |             if let p = byName[name] {
+  35 |                 // Update existing record
+  36 |                 p.sex = sex
+  37 |                 p.age = age
+  38 |                 p.weight = weight
+  39 |                 p.athleticAbility = athleticAbility
+  40 |                 p.height = height
+  41 |                 p.isActive = true
+  42 |                 return p
+  43 |             } else {
+  44 |                 // Insert new record
+  45 |                 let p = Person(
+  46 |                     displayName: name,
+  47 |                     sex: sex,
+  48 |                     age: age,
+  49 |                     weight: weight,
+  50 |                     athleticAbility: athleticAbility,
+  51 |                     height: height,
+  52 |                     isActive: true
+  53 |                 )
+  54 |                 context.insert(p)
+  55 |                 byName[name] = p
+  56 |                 return p
+  57 |             }
+  58 |         }
+  59 | 
+  60 |         // MARK: - Roster (from your sheet)
+  61 | 
+  62 |         let dean     = upsert("Dean",     sex: "M", age: 60, weight: 250, athleticAbility: 3, height: #"6'3""#)
+  63 |         let shannon  = upsert("Shannon",  sex: "F", age: 57, weight: 150, athleticAbility: 4, height: #"6'"#)
+  64 | 
+  65 |         let michael  = upsert("Michael",  sex: "M", age: 34, weight: 250, athleticAbility: 3, height: #"6'"#)
+  66 |         let brittany = upsert("Brittany", sex: "F", age: 33, weight: 190, athleticAbility: 1, height: #"5'10""#)
+  67 | 
+  68 |         let blake    = upsert("Blake",    sex: "M", age: 30, weight: 250, athleticAbility: 5, height: #"6'2""#)
+  69 |         let brooklin = upsert("Brooklin", sex: "F", age: 30, weight: 140, athleticAbility: 4, height: #"5'2""#)
+  70 | 
+  71 |         let brandon  = upsert("Brandon",  sex: "M", age: 27, weight: 260, athleticAbility: 5, height: #"6'6""#)
+  72 |         let jenna    = upsert("Jenna",    sex: "F", age: 27, weight: 140, athleticAbility: 4, height: #"5'8""#)
+  73 | 
+  74 |         let hunter   = upsert("Hunter",   sex: "M", age: 27, weight: 260, athleticAbility: 5, height: #"6'5""#)
+  75 |         let brooke   = upsert("Brooke",   sex: "F", age: 24, weight: 140, athleticAbility: 5, height: #"5'10""#)
+  76 | 
+  77 |         // MARK: - Spouse linking (bidirectional)
+  78 | 
+  79 |         func linkSpouses(_ a: Person, _ b: Person) {
+  80 |             a.spouseId = b.id
+  81 |             b.spouseId = a.id
+  82 |         }
+  83 | 
+  84 |         linkSpouses(dean, shannon)
+  85 |         linkSpouses(michael, brittany)
+  86 |         linkSpouses(blake, brooklin)
+  87 |         linkSpouses(brandon, jenna)
+  88 |         linkSpouses(hunter, brooke)
+  89 | 
+  90 |         try context.save()
+  91 |     }
+  92 | }
+
+
+END FILE: ./SeedData.swift
+
+
+################################################################################
+START FILE: ./GameCatalogCSVImporter.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | enum GameCatalogCSVImporterError: LocalizedError {
+   5 |     case invalidFormat(String)
+   6 |     case missingRequiredColumn(String)
+   7 | 
+   8 |     var errorDescription: String? {
+   9 |         switch self {
+  10 |         case .invalidFormat(let msg): return msg
+  11 |         case .missingRequiredColumn(let col): return "CSV is missing required column: \(col)"
+  12 |         }
+  13 |     }
+  14 | }
+  15 | 
+  16 | @MainActor
+  17 | enum GameCatalogCSVImporter {
+  18 | 
+  19 |     struct ImportResult {
+  20 |         var insertedOrUpdated: Int
+  21 |         var skipped: Int
+  22 |         var removed: Int
+  23 |     }
+  24 | 
+  25 |     /// Importer tailored for your "Minute to Win It - Head to Head" CSV:
+  26 |     /// Required columns:
+  27 |     /// - gameId
+  28 |     /// - gameName
+  29 |     /// - teamType
+  30 |     ///
+  31 |     /// Optional columns:
+  32 |     /// - groupName
+  33 |     /// - defaultTeamCount, defaultPlayersPerTeam, defaultRoundsPerGame
+  34 |     /// - instructionText
+  35 |     /// - Materials, Gather, Purchase, Url (ignored by default)
+  36 |     /// - Check (if "x", row is skipped and counted as removed)
+  37 |     static func importCSV(context: ModelContext, csvData: Data) throws -> ImportResult {
+  38 | 
+  39 |         guard let text = String(data: csvData, encoding: .utf8) else {
+  40 |             throw GameCatalogCSVImporterError.invalidFormat("CSV file could not be read as UTF-8 text.")
+  41 |         }
+  42 | 
+  43 |         let rawLines = text
+  44 |             .split(whereSeparator: \.isNewline)
+  45 |             .map(String.init)
+  46 |             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+  47 | 
+  48 |         guard !rawLines.isEmpty else {
+  49 |             throw GameCatalogCSVImporterError.invalidFormat("CSV file is empty.")
+  50 |         }
+  51 | 
+  52 |         // 1) Find the header row by detecting the expected columns.
+  53 |         guard let headerIndex = rawLines.firstIndex(where: { line in
+  54 |             let cols = parseCSVLine(line).map(normalizeHeaderKey)
+  55 |             return cols.contains("gameid") && cols.contains("gamename") && cols.contains("teamtype")
+  56 |         }) else {
+  57 |             let firstLineCols = parseCSVLine(rawLines.first ?? "")
+  58 |                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+  59 |                 .joined(separator: ", ")
+  60 |             throw GameCatalogCSVImporterError.invalidFormat(
+  61 |                 "Could not find a valid header row. Expected columns: gameId, gameName, teamType. " +
+  62 |                 "First line columns were: \(firstLineCols)"
+  63 |             )
+  64 |         }
+  65 | 
+  66 |         let headerCols = parseCSVLine(rawLines[headerIndex])
+  67 | 
+  68 |         // Build header map; tolerate duplicate column names by keeping first occurrence.
+  69 |         var headerMap: [String: Int] = [:]
+  70 |         for (idx, name) in headerCols.enumerated() {
+  71 |             let key = normalizeHeaderKey(name)
+  72 |             if headerMap[key] == nil {
+  73 |                 headerMap[key] = idx
+  74 |             }
+  75 |         }
+  76 | 
+  77 |         func colIndex(_ key: String, alternatives: [String] = []) -> Int? {
+  78 |             if let i = headerMap[normalizeHeaderKey(key)] { return i }
+  79 |             for alt in alternatives {
+  80 |                 if let i = headerMap[normalizeHeaderKey(alt)] { return i }
+  81 |             }
+  82 |             return nil
+  83 |         }
+  84 | 
+  85 |         // Required
+  86 |         guard let iGameId = colIndex("gameId", alternatives: ["gameid", "id"]) else {
+  87 |             throw GameCatalogCSVImporterError.missingRequiredColumn("gameId")
+  88 |         }
+  89 |         guard let iGameName = colIndex("gameName", alternatives: ["gamename", "name"]) else {
+  90 |             throw GameCatalogCSVImporterError.missingRequiredColumn("gameName")
+  91 |         }
+  92 |         guard let iTeamType = colIndex("teamType", alternatives: ["teamtype"]) else {
+  93 |             throw GameCatalogCSVImporterError.missingRequiredColumn("teamType")
+  94 |         }
+  95 | 
+  96 |         // Optional
+  97 |         let iGroupName = colIndex("groupName", alternatives: ["group", "groupname"])
+  98 |         let iTeamCount = colIndex("defaultTeamCount", alternatives: ["defaultteamcount"])
+  99 |         let iPlayersPerTeam = colIndex("defaultPlayersPerTeam", alternatives: ["defaultplayersperteam"])
+ 100 |         let iRounds = colIndex("defaultRoundsPerGame", alternatives: ["defaultroundspergame"])
+ 101 |         let iInstructionText = colIndex("instructionText", alternatives: ["instructiontext", "instructions"])
+ 102 |         let iCheck = colIndex("check", alternatives: ["Check"])
+ 103 | 
+ 104 |         var result = ImportResult(insertedOrUpdated: 0, skipped: 0, removed: 0)
+ 105 | 
+ 106 |         // 2) Process rows
+ 107 |         for line in rawLines.dropFirst(headerIndex + 1) {
+ 108 |             let cols = parseCSVLine(line)
+ 109 | 
+ 110 |             guard iGameId < cols.count, iGameName < cols.count, iTeamType < cols.count else {
+ 111 |                 result.skipped += 1
+ 112 |                 continue
+ 113 |             }
+ 114 | 
+ 115 |             // Check column: if "x" -> skip/remove
+ 116 |             if let iCheck, iCheck < cols.count {
+ 117 |                 let flag = cols[iCheck].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+ 118 |                 if flag == "x" {
+ 119 |                     result.removed += 1
+ 120 |                     continue
+ 121 |                 }
+ 122 |             }
+ 123 | 
+ 124 |             let gameIdRaw = cols[iGameId].trimmingCharacters(in: .whitespacesAndNewlines)
+ 125 |             let name = cols[iGameName].trimmingCharacters(in: .whitespacesAndNewlines)
+ 126 | 
+ 127 |             guard !gameIdRaw.isEmpty, !name.isEmpty else {
+ 128 |                 result.skipped += 1
+ 129 |                 continue
+ 130 |             }
+ 131 | 
+ 132 |             // Stable externalId derived from gameId
+ 133 |             let externalId = "mtwi_\(slug(gameIdRaw))"
+ 134 | 
+ 135 |             let groupName: String? = {
+ 136 |                 guard let iGroupName, iGroupName < cols.count else { return nil }
+ 137 |                 let g = cols[iGroupName].trimmingCharacters(in: .whitespacesAndNewlines)
+ 138 |                 return g.isEmpty ? nil : g
+ 139 |             }()
+ 140 | 
+ 141 |             let instructions: String? = {
+ 142 |                 guard let iInstructionText, iInstructionText < cols.count else { return nil }
+ 143 |                 let t = cols[iInstructionText].trimmingCharacters(in: .whitespacesAndNewlines)
+ 144 |                 return t.isEmpty ? nil : t
+ 145 |             }()
+ 146 | 
+ 147 |             let teamType = mapTeamType(cols[iTeamType])
+ 148 | 
+ 149 |             let defaultTeamCount = parsePositiveInt(cols, iTeamCount, defaultValue: 2)
+ 150 |             let defaultPlayersPerTeam = parsePositiveInt(cols, iPlayersPerTeam, defaultValue: 2)
+ 151 |             let defaultRoundsPerGame = parsePositiveInt(cols, iRounds, defaultValue: 1)
+ 152 | 
+ 153 |             let existing = try fetchTemplateByExternalId(context: context, externalId: externalId)
+ 154 | 
+ 155 |             if let t = existing {
+ 156 |                 t.name = name
+ 157 |                 t.groupName = groupName
+ 158 |                 t.defaultTeamCount = defaultTeamCount
+ 159 |                 t.defaultPlayersPerTeam = defaultPlayersPerTeam
+ 160 |                 t.defaultRoundsPerGame = defaultRoundsPerGame
+ 161 |                 t.defaultTeamTypeRaw = teamType.rawValue
+ 162 |                 t.instructions = instructions
+ 163 |                 result.insertedOrUpdated += 1
+ 164 |             } else {
+ 165 |                 let t = GameTemplate(
+ 166 |                     externalId: externalId,
+ 167 |                     name: name,
+ 168 |                     groupName: groupName,
+ 169 |                     defaultTeamCount: defaultTeamCount,
+ 170 |                     defaultPlayersPerTeam: defaultPlayersPerTeam,
+ 171 |                     defaultRoundsPerGame: defaultRoundsPerGame,
+ 172 |                     defaultTeamType: teamType,
+ 173 |                     instructions: instructions
+ 174 |                 )
+ 175 |                 context.insert(t)
+ 176 |                 result.insertedOrUpdated += 1
+ 177 |             }
+ 178 |         }
+ 179 | 
+ 180 |         try context.save()
+ 181 |         return result
+ 182 |     }
+ 183 | 
+ 184 |     // MARK: - Helpers
+ 185 | 
+ 186 |     private static func parsePositiveInt(_ cols: [String], _ index: Int?, defaultValue: Int) -> Int {
+ 187 |         guard let index, index < cols.count else { return defaultValue }
+ 188 |         let s = cols[index].trimmingCharacters(in: .whitespacesAndNewlines)
+ 189 |         if s.isEmpty { return defaultValue }
+ 190 |         if let v = Int(s), v > 0 { return v }
+ 191 |         return defaultValue
+ 192 |     }
+ 193 | 
+ 194 |     private static func mapTeamType(_ raw: String) -> TeamType {
+ 195 |         let n = raw
+ 196 |             .trimmingCharacters(in: .whitespacesAndNewlines)
+ 197 |             .lowercased()
+ 198 |             .replacingOccurrences(of: " ", with: "")
+ 199 |             .replacingOccurrences(of: "_", with: "")
+ 200 |             .replacingOccurrences(of: "-", with: "")
+ 201 | 
+ 202 |         if n.isEmpty { return .any }
+ 203 | 
+ 204 |         switch n {
+ 205 |         case "any", "anygender", "mixed", "coed", "all":
+ 206 |             return .any
+ 207 |         case "maleonly", "menonly", "boysonly", "male", "men":
+ 208 |             return .maleOnly
+ 209 |         case "femaleonly", "womenonly", "girlsonly", "female", "women":
+ 210 |             return .femaleOnly
+ 211 |         case "couplesonly", "couples", "couple", "spousesonly", "spouse":
+ 212 |             return .couplesOnly
+ 213 |         default:
+ 214 |             return .any
+ 215 |         }
+ 216 |     }
+ 217 | 
+ 218 |     private static func normalizeHeaderKey(_ s: String) -> String {
+ 219 |         let lowered = s.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+ 220 |         let compact = lowered
+ 221 |             .replacingOccurrences(of: " ", with: "")
+ 222 |             .replacingOccurrences(of: "_", with: "")
+ 223 |         let allowed = compact.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }
+ 224 |         return String(String.UnicodeScalarView(allowed))
+ 225 |     }
+ 226 | 
+ 227 |     private static func slug(_ s: String) -> String {
+ 228 |         let lowered = s.lowercased()
+ 229 |         let mapped = lowered.unicodeScalars.map { scalar -> Character in
+ 230 |             CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : "-"
+ 231 |         }
+ 232 |         let raw = String(mapped)
+ 233 |         let collapsed = raw
+ 234 |             .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
+ 235 |             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+ 236 |         return collapsed.isEmpty ? UUID().uuidString.lowercased() : collapsed
+ 237 |     }
+ 238 | 
+ 239 |     /// CSV parser with quote handling (supports commas inside quoted fields)
+ 240 |     private static func parseCSVLine(_ line: String) -> [String] {
+ 241 |         var result: [String] = []
+ 242 |         var current = ""
+ 243 |         var inQuotes = false
+ 244 |         var i = line.startIndex
+ 245 | 
+ 246 |         while i < line.endIndex {
+ 247 |             let ch = line[i]
+ 248 | 
+ 249 |             if ch == "\"" {
+ 250 |                 let next = line.index(after: i)
+ 251 |                 if inQuotes, next < line.endIndex, line[next] == "\"" {
+ 252 |                     current.append("\"")
+ 253 |                     i = line.index(after: next)
+ 254 |                     continue
+ 255 |                 }
+ 256 |                 inQuotes.toggle()
+ 257 |                 i = line.index(after: i)
+ 258 |                 continue
+ 259 |             }
+ 260 | 
+ 261 |             if ch == ",", !inQuotes {
+ 262 |                 result.append(current)
+ 263 |                 current = ""
+ 264 |                 i = line.index(after: i)
+ 265 |                 continue
+ 266 |             }
+ 267 | 
+ 268 |             current.append(ch)
+ 269 |             i = line.index(after: i)
+ 270 |         }
+ 271 | 
+ 272 |         result.append(current)
+ 273 |         return result
+ 274 |     }
+ 275 | 
+ 276 |     private static func fetchTemplateByExternalId(context: ModelContext, externalId: String) throws -> GameTemplate? {
+ 277 |         let descriptor = FetchDescriptor<GameTemplate>(
+ 278 |             predicate: #Predicate { $0.externalId == externalId }
+ 279 |         )
+ 280 |         return try context.fetch(descriptor).first
+ 281 |     }
+ 282 | }
+
+
+END FILE: ./GameCatalogCSVImporter.swift
+
+
+################################################################################
+START FILE: ./Models.swift
+################################################################################
+   1 | import Foundation
+   2 | import SwiftData
+   3 | 
+   4 | // MARK: - Enums
+   5 | 
+   6 | enum EventStatus: String, Codable, CaseIterable {
+   7 |     case available
+   8 |     case active
+   9 |     case paused
+  10 |     case completed
+  11 | }
+  12 | 
+  13 | enum GameStatus: String, Codable, CaseIterable {
+  14 |     case notStarted
+  15 |     case inProgress
+  16 |     case completed
+  17 | }
+  18 | 
+  19 | enum TeamType: String, Codable, CaseIterable {
+  20 |     case any
+  21 |     case maleOnly
+  22 |     case femaleOnly
+  23 |     case couplesOnly
+  24 | }
+  25 | 
+  26 | enum RoundResultType: String, Codable, CaseIterable {
+  27 |     case win
+  28 |     case tie
+  29 | }
+  30 | 
+  31 | // MARK: - People
+  32 | 
+  33 | @Model
+  34 | final class Person {
+  35 |     @Attribute(.unique) var id: UUID
+  36 |     var displayName: String
+  37 |     var sex: String?
+  38 |     var spouseId: UUID?
+  39 | 
+  40 |     var age: Int?
+  41 |     var weight: Int?
+  42 |     var athleticAbility: Int?
+  43 |     var height: String?
+  44 | 
+  45 |     var isActive: Bool
+  46 | 
+  47 |     init(
+  48 |         id: UUID = UUID(),
+  49 |         displayName: String,
+  50 |         sex: String? = nil,
+  51 |         spouseId: UUID? = nil,
+  52 |         age: Int? = nil,
+  53 |         weight: Int? = nil,
+  54 |         athleticAbility: Int? = nil,
+  55 |         height: String? = nil,
+  56 |         isActive: Bool = true
+  57 |     ) {
+  58 |         self.id = id
+  59 |         self.displayName = displayName
+  60 |         self.sex = sex
+  61 |         self.spouseId = spouseId
+  62 |         self.age = age
+  63 |         self.weight = weight
+  64 |         self.athleticAbility = athleticAbility
+  65 |         self.height = height
+  66 |         self.isActive = isActive
+  67 |     }
+  68 | }
+  69 | 
+  70 | // MARK: - Game Templates
+  71 | 
+  72 | @Model
+  73 | final class GameTemplate {
+  74 |     @Attribute(.unique) var id: UUID
+  75 |     @Attribute(.unique) var externalId: String
+  76 | 
+  77 |     var name: String
+  78 |     var groupName: String?
+  79 | 
+  80 |     var defaultTeamCount: Int
+  81 |     var defaultPlayersPerTeam: Int
+  82 |     var defaultRoundsPerGame: Int
+  83 |     var defaultTeamTypeRaw: String
+  84 | 
+  85 |     var instructions: String?
+  86 | 
+  87 |     init(
+  88 |         id: UUID = UUID(),
+  89 |         externalId: String,
+  90 |         name: String,
+  91 |         groupName: String? = nil,
+  92 |         defaultTeamCount: Int,
+  93 |         defaultPlayersPerTeam: Int,
+  94 |         defaultRoundsPerGame: Int,
+  95 |         defaultTeamType: TeamType,
+  96 |         instructions: String? = nil
+  97 |     ) {
+  98 |         self.id = id
+  99 |         self.externalId = externalId
+ 100 |         self.name = name
+ 101 |         self.groupName = groupName
+ 102 |         self.defaultTeamCount = defaultTeamCount
+ 103 |         self.defaultPlayersPerTeam = defaultPlayersPerTeam
+ 104 |         self.defaultRoundsPerGame = defaultRoundsPerGame
+ 105 |         self.defaultTeamTypeRaw = defaultTeamType.rawValue
+ 106 |         self.instructions = instructions
+ 107 |     }
+ 108 | 
+ 109 |     @Transient
+ 110 |     var defaultTeamType: TeamType {
+ 111 |         get { TeamType(rawValue: defaultTeamTypeRaw) ?? .any }
+ 112 |         set { defaultTeamTypeRaw = newValue.rawValue }
+ 113 |     }
+ 114 | }
+ 115 | 
+ 116 | // MARK: - RoundTeam
+ 117 | 
+ 118 | struct RoundTeam: Codable, Equatable, Identifiable {
+ 119 |     var id: UUID
+ 120 |     var memberPersonIds: [UUID]
+ 121 | 
+ 122 |     init(id: UUID = UUID(), memberPersonIds: [UUID]) {
+ 123 |         self.id = id
+ 124 |         self.memberPersonIds = memberPersonIds
+ 125 |     }
+ 126 | }
+ 127 | 
+ 128 | // MARK: - Event
+ 129 | 
+ 130 | @Model
+ 131 | final class Event {
+ 132 |     @Attribute(.unique) var id: UUID
+ 133 |     var name: String
+ 134 | 
+ 135 |     var statusRaw: String
+ 136 |     var participantIds: [UUID]
+ 137 | 
+ 138 |     var createdAt: Date
+ 139 |     var lastModifiedAt: Date
+ 140 | 
+ 141 |     var currentEventGameId: UUID?
+ 142 | 
+ 143 |     @Relationship(deleteRule: .cascade, inverse: \EventGame.event)
+ 144 |     var eventGames: [EventGame]
+ 145 | 
+ 146 |     init(
+ 147 |         id: UUID = UUID(),
+ 148 |         name: String,
+ 149 |         status: EventStatus = .available,
+ 150 |         participantIds: [UUID] = [],
+ 151 |         createdAt: Date = Date(),
+ 152 |         lastModifiedAt: Date = Date(),
+ 153 |         currentEventGameId: UUID? = nil,
+ 154 |         eventGames: [EventGame] = []
+ 155 |     ) {
+ 156 |         self.id = id
+ 157 |         self.name = name
+ 158 |         self.statusRaw = status.rawValue
+ 159 |         self.participantIds = participantIds
+ 160 |         self.createdAt = createdAt
+ 161 |         self.lastModifiedAt = lastModifiedAt
+ 162 |         self.currentEventGameId = currentEventGameId
+ 163 |         self.eventGames = eventGames
+ 164 |     }
+ 165 | 
+ 166 |     @Transient
+ 167 |     var status: EventStatus {
+ 168 |         get { EventStatus(rawValue: statusRaw) ?? .available }
+ 169 |         set { statusRaw = newValue.rawValue }
+ 170 |     }
+ 171 | }
+ 172 | 
+ 173 | // MARK: - EventGame
+ 174 | 
+ 175 | @Model
+ 176 | final class EventGame {
+ 177 |     @Attribute(.unique) var id: UUID
+ 178 | 
+ 179 |     var event: Event?
+ 180 | 
+ 181 |     var gameTemplateId: UUID
+ 182 |     var orderIndex: Int
+ 183 |     var statusRaw: String
+ 184 | 
+ 185 |     var overrideTeamCount: Int?
+ 186 |     var overridePlayersPerTeam: Int?
+ 187 |     var overrideRoundsPerGame: Int? // used as a suggestion; you can keep adding rounds
+ 188 |     var overrideTeamTypeRaw: String?
+ 189 |     var overrideInstructions: String?
+ 190 | 
+ 191 |     /// Optional host override to force specific players into specific teams.
+ 192 |     /// Stored as JSON-encoded [[UUID]] where each inner array is one team.
+ 193 |     var overrideTeamPlayersData: Data?
+ 194 | 
+ 195 |     @Relationship(deleteRule: .cascade, inverse: \Round.eventGame)
+ 196 |     var rounds: [Round]
+ 197 | 
+ 198 |     init(
+ 199 |         id: UUID = UUID(),
+ 200 |         event: Event? = nil,
+ 201 |         gameTemplateId: UUID,
+ 202 |         orderIndex: Int,
+ 203 |         status: GameStatus = .notStarted,
+ 204 |         overrideTeamCount: Int? = nil,
+ 205 |         overridePlayersPerTeam: Int? = nil,
+ 206 |         overrideRoundsPerGame: Int? = nil,
+ 207 |         overrideTeamType: TeamType? = nil,
+ 208 |         overrideTeamPlayers: [[UUID]]? = nil,
+ 209 |         overrideInstructions: String? = nil,
+ 210 |         rounds: [Round] = []
+ 211 |     ) {
+ 212 |         self.id = id
+ 213 |         self.event = event
+ 214 |         self.gameTemplateId = gameTemplateId
+ 215 |         self.orderIndex = orderIndex
+ 216 |         self.statusRaw = status.rawValue
+ 217 |         self.overrideTeamCount = overrideTeamCount
+ 218 |         self.overridePlayersPerTeam = overridePlayersPerTeam
+ 219 |         self.overrideRoundsPerGame = overrideRoundsPerGame
+ 220 |         self.overrideTeamTypeRaw = overrideTeamType?.rawValue
+ 221 |         if let overrideTeamPlayers {
+ 222 |             self.overrideTeamPlayersData = try? JSONEncoder().encode(overrideTeamPlayers)
+ 223 |         } else {
+ 224 |             self.overrideTeamPlayersData = nil
+ 225 |         }
+ 226 |         self.overrideInstructions = overrideInstructions
+ 227 |         self.rounds = rounds
+ 228 |     }
+ 229 | 
+ 230 |     @Transient
+ 231 |     var status: GameStatus {
+ 232 |         get { GameStatus(rawValue: statusRaw) ?? .notStarted }
+ 233 |         set { statusRaw = newValue.rawValue }
+ 234 |     }
+ 235 | 
+ 236 |     @Transient
+ 237 |     var overrideTeamType: TeamType? {
+ 238 |         get { overrideTeamTypeRaw.flatMap { TeamType(rawValue: $0) } }
+ 239 |         set { overrideTeamTypeRaw = newValue?.rawValue }
+ 240 |     }
+ 241 | 
+ 242 |     @Transient
+ 243 |     var overrideTeamPlayers: [[UUID]]? {
+ 244 |         get {
+ 245 |             guard let data = overrideTeamPlayersData else { return nil }
+ 246 |             return try? JSONDecoder().decode([[UUID]].self, from: data)
+ 247 |         }
+ 248 |         set {
+ 249 |             if let newValue {
+ 250 |                 overrideTeamPlayersData = try? JSONEncoder().encode(newValue)
+ 251 |             } else {
+ 252 |                 overrideTeamPlayersData = nil
+ 253 |             }
+ 254 |         }
+ 255 |     }
+ 256 | }
+ 257 | 
+ 258 | // MARK: - Round
+ 259 | 
+ 260 | @Model
+ 261 | final class Round {
+ 262 |     @Attribute(.unique) var id: UUID
+ 263 | 
+ 264 |     var eventGame: EventGame?
+ 265 | 
+ 266 |     var roundIndex: Int
+ 267 |     var createdAt: Date
+ 268 |     var completedAt: Date?
+ 269 | 
+ 270 |     /// Teams stored
+ 271 |     var teamsData: Data
+ 272 | 
+ 273 |     /// Individual placements stored: [personId: placement] (1 = first, 2 = second)
+ 274 |     var placementsData: Data
+ 275 | 
+ 276 |     var resultTypeRaw: String?
+ 277 |     var winningTeamId: UUID?
+ 278 | 
+ 279 |     init(
+ 280 |         id: UUID = UUID(),
+ 281 |         eventGame: EventGame? = nil,
+ 282 |         roundIndex: Int,
+ 283 |         createdAt: Date = Date(),
+ 284 |         completedAt: Date? = nil,
+ 285 |         teams: [RoundTeam] = [],
+ 286 |         placements: [UUID: Int] = [:],
+ 287 |         resultType: RoundResultType? = nil,
+ 288 |         winningTeamId: UUID? = nil
+ 289 |     ) {
+ 290 |         self.id = id
+ 291 |         self.eventGame = eventGame
+ 292 |         self.roundIndex = roundIndex
+ 293 |         self.createdAt = createdAt
+ 294 |         self.completedAt = completedAt
+ 295 |         self.teamsData = (try? JSONEncoder().encode(teams)) ?? Data()
+ 296 |         self.placementsData = (try? JSONEncoder().encode(placements)) ?? Data()
+ 297 |         self.resultTypeRaw = resultType?.rawValue
+ 298 |         self.winningTeamId = winningTeamId
+ 299 |     }
+ 300 | 
+ 301 |     @Transient
+ 302 |     var teams: [RoundTeam] {
+ 303 |         get { (try? JSONDecoder().decode([RoundTeam].self, from: teamsData)) ?? [] }
+ 304 |         set { teamsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+ 305 |     }
+ 306 | 
+ 307 |     @Transient
+ 308 |     var placements: [UUID: Int] {
+ 309 |         get { (try? JSONDecoder().decode([UUID: Int].self, from: placementsData)) ?? [:] }
+ 310 |         set { placementsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+ 311 |     }
+ 312 | 
+ 313 |     @Transient
+ 314 |     var resultType: RoundResultType? {
+ 315 |         get { resultTypeRaw.flatMap { RoundResultType(rawValue: $0) } }
+ 316 |         set { resultTypeRaw = newValue?.rawValue }
+ 317 |     }
+ 318 | 
+ 319 |     @Transient
+ 320 |     var isLocked: Bool {
+ 321 |         completedAt != nil
+ 322 |     }
+ 323 | }
+
+
+END FILE: ./Models.swift
+
+
+################################################################################
+START FILE: ./ContentView.swift
+################################################################################
+   1 | import SwiftUI
+   2 | import SwiftData
+   3 | import UniformTypeIdentifiers
+   4 | 
+   5 | struct ContentView: View {
+   6 |     @Environment(\.modelContext) private var context
+   7 | 
+   8 |     @Query(sort: \Event.createdAt, order: .reverse)
+   9 |     private var events: [Event]
+  10 | 
+  11 |     @State private var showAddEvent = false
+  12 | 
+  13 |     @AppStorage("didSeedRoster_v2") private var didSeedRoster = false
+  14 | 
+  15 |     var body: some View {
+  16 |         NavigationStack {
+  17 |             List {
+  18 |                 ForEach(events) { event in
+  19 |                     NavigationLink {
+  20 |                         EventDetailView(event: event)
+  21 |                     } label: {
+  22 |                         VStack(alignment: .leading, spacing: 4) {
+  23 |                             Text(event.name).font(.headline)
+  24 |                             Text(event.statusRaw.capitalized)
+  25 |                                 .font(.subheadline)
+  26 |                                 .foregroundStyle(.secondary)
+  27 |                         }
+  28 |                     }
+  29 |                 }
+  30 |                 .onDelete(perform: deleteEvents)
+  31 |             }
+  32 |             .navigationTitle("Christmas Games")
+  33 |             .toolbar {
+  34 |                 ToolbarItem(placement: .topBarTrailing) {
+  35 |                     Button("Add Event") { showAddEvent = true }
+  36 |                 }
+  37 |             }
+  38 |             .sheet(isPresented: $showAddEvent) {
+  39 |                 AddEventSheet()
+  40 |             }
+  41 |             .task {
+  42 |                 guard !didSeedRoster else { return }
+  43 |                 do {
+  44 |                     try SeedData.seedOrUpdateRoster(context: context)
+  45 |                     didSeedRoster = true
+  46 |                 } catch {
+  47 |                     print("Roster seed failed: \(error)")
+  48 |                 }
+  49 |             }
+  50 |         }
+  51 |     }
+  52 | 
+  53 |     private func deleteEvents(at offsets: IndexSet) {
+  54 |         for index in offsets { context.delete(events[index]) }
+  55 |         try? context.save()
+  56 |     }
+  57 | }
+  58 | 
+  59 | // MARK: - Event Detail
+  60 | 
+  61 | private struct EventDetailView: View {
+  62 |     @Environment(\.modelContext) private var context
+  63 | 
+  64 |     let event: Event
+  65 | 
+  66 |     @Query(sort: \GameTemplate.name)
+  67 |     private var templates: [GameTemplate]
+  68 | 
+  69 |     @State private var showAddGame = false
+  70 |     @State private var showPlayers = false
+  71 | 
+  72 |     @State private var message: String?
+  73 |     @State private var showMessage = false
+  74 | 
+  75 |     var body: some View {
+  76 |         let sortedGames = event.eventGames.sorted { $0.orderIndex < $1.orderIndex }
+  77 | 
+  78 |         List {
+  79 |             Section {
+  80 |                 HStack { Text("Players"); Spacer(); Text("\(event.participantIds.count)").foregroundStyle(.secondary) }
+  81 |                 HStack { Text("Games"); Spacer(); Text("\(event.eventGames.count)").foregroundStyle(.secondary) }
+  82 |                 HStack { Text("Status"); Spacer(); Text(event.statusRaw.capitalized).foregroundStyle(.secondary) }
+  83 |             }
+  84 | 
+  85 |             Section {
+  86 |                 NavigationLink("Run Game") {
+  87 |                     RunGameView(event: event)
+  88 |                 }
+  89 |                 .disabled(event.eventGames.isEmpty || event.participantIds.isEmpty)
+  90 |             } header: {
+  91 |                 Text("Host")
+  92 |             }
+  93 | 
+  94 |             Section("Games") {
+  95 |                 ForEach(sortedGames) { eg in
+  96 |                     let name = templates.first(where: { $0.id == eg.gameTemplateId })?.name ?? "Unknown Game"
+  97 |                     HStack {
+  98 |                         Text(name)
+  99 |                         Spacer()
+ 100 |                         Text(eg.statusRaw.capitalized).foregroundStyle(.secondary)
+ 101 |                     }
+ 102 |                 }
+ 103 |             }
+ 104 |         }
+ 105 |         .navigationTitle(event.name)
+ 106 |         .toolbar {
+ 107 |             ToolbarItem(placement: .topBarLeading) {
+ 108 |                 lifecycleButton()
+ 109 |             }
+ 110 |             ToolbarItemGroup(placement: .topBarTrailing) {
+ 111 |                 Button("Players") { showPlayers = true }
+ 112 |                 Button("Add Games") { showAddGame = true }
+ 113 |             }
+ 114 |         }
+ 115 |         .sheet(isPresented: $showAddGame) {
+ 116 |             AddGameToEventSheet(event: event)
+ 117 |         }
+ 118 |         .sheet(isPresented: $showPlayers) {
+ 119 |             SelectEventPlayersSheet(event: event)
+ 120 |         }
+ 121 |         .alert("Message", isPresented: $showMessage) {
+ 122 |             Button("OK", role: .cancel) { }
+ 123 |         } message: {
+ 124 |             Text(message ?? "Unknown error")
+ 125 |         }
+ 126 |     }
+ 127 | 
+ 128 |     @ViewBuilder
+ 129 |     private func lifecycleButton() -> some View {
+ 130 |         let engine = EventEngine(context: context)
+ 131 | 
+ 132 |         switch event.status {
+ 133 |         case .available:
+ 134 |             Button("Start") {
+ 135 |                 do { try engine.startEvent(event) }
+ 136 |                 catch { show(error) }
+ 137 |             }
+ 138 |             .disabled(event.eventGames.isEmpty || event.participantIds.isEmpty)
+ 139 | 
+ 140 |         case .active:
+ 141 |             Button("Pause") {
+ 142 |                 do { try engine.pauseEvent(event) }
+ 143 |                 catch { show(error) }
+ 144 |             }
+ 145 | 
+ 146 |         case .paused:
+ 147 |             Button("Resume") {
+ 148 |                 do { try engine.resumeEvent(event) }
+ 149 |                 catch { show(error) }
+ 150 |             }
+ 151 | 
+ 152 |         case .completed:
+ 153 |             EmptyView()
+ 154 |         }
+ 155 |     }
+ 156 | 
+ 157 |     private func show(_ error: Error) {
+ 158 |         message = error.localizedDescription
+ 159 |         showMessage = true
+ 160 |     }
+ 161 | }
+ 162 | 
+ 163 | // MARK: - Event Players Sheet
+ 164 | 
+ 165 | private struct SelectEventPlayersSheet: View {
+ 166 |     @Environment(\.dismiss) private var dismiss
+ 167 |     @Environment(\.modelContext) private var context
+ 168 | 
+ 169 |     let event: Event
+ 170 | 
+ 171 |     @Query(sort: \Person.displayName)
+ 172 |     private var people: [Person]
+ 173 | 
+ 174 |     @State private var selectedIds: Set<UUID> = []
+ 175 |     @State private var errorMessage: String?
+ 176 |     @State private var showError = false
+ 177 | 
+ 178 |     var body: some View {
+ 179 |         NavigationStack {
+ 180 |             List(selection: $selectedIds) {
+ 181 |                 ForEach(activePeople) { person in
+ 182 |                     Text(person.displayName).tag(person.id)
+ 183 |                 }
+ 184 |             }
+ 185 |             .environment(\.editMode, .constant(.active))
+ 186 |             .navigationTitle("Select Players")
+ 187 |             .toolbar {
+ 188 |                 ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+ 189 |                 ToolbarItem(placement: .topBarTrailing) {
+ 190 |                     Button("Save (\(selectedIds.count))") { save() }
+ 191 |                         .disabled(selectedIds.isEmpty)
+ 192 |                 }
+ 193 |                 ToolbarItem(placement: .bottomBar) {
+ 194 |                     HStack {
+ 195 |                         Button("Select All") { selectedIds = Set(activePeople.map { $0.id }) }
+ 196 |                         Button("Select None") { selectedIds.removeAll() }
+ 197 |                     }
+ 198 |                 }
+ 199 |             }
+ 200 |             .onAppear { selectedIds = Set(event.participantIds) }
+ 201 |             .alert("Error", isPresented: $showError) {
+ 202 |                 Button("OK", role: .cancel) { }
+ 203 |             } message: {
+ 204 |                 Text(errorMessage ?? "Unknown error")
+ 205 |             }
+ 206 |         }
+ 207 |     }
+ 208 | 
+ 209 |     private var activePeople: [Person] {
+ 210 |         people.filter { $0.isActive }
+ 211 |     }
+ 212 | 
+ 213 |     private func save() {
+ 214 |         do {
+ 215 |             try EventEngine(context: context).setParticipants(for: event, participantIds: Array(selectedIds))
+ 216 |             dismiss()
+ 217 |         } catch {
+ 218 |             errorMessage = error.localizedDescription
+ 219 |             showError = true
+ 220 |         }
+ 221 |     }
+ 222 | }
+ 223 | 
+ 224 | 
+ 225 | // MARK: - Run Game Screen
+ 226 | 
+ 227 | 
+ 228 | 
+ 229 | private struct RunGameView: View {
+ 230 |     @Environment(\.modelContext) private var context
+ 231 |     let event: Event
+ 232 | 
+ 233 |     @Query(sort: \Person.displayName)
+ 234 |     private var people: [Person]
+ 235 | 
+ 236 |     @Query(sort: \GameTemplate.name)
+ 237 |     private var templates: [GameTemplate]
+ 238 | 
+ 239 |     @State private var message: String?
+ 240 |     @State private var showMessage = false
+ 241 | 
+ 242 |     @State private var showPickNextGame = false
+ 243 | 
+ 244 |     @State private var showSwap = false
+ 245 |     @State private var swapOutgoing: UUID?
+ 246 | 
+ 247 |     @State private var showAfterRoundDialog = false
+ 248 |     @State private var showAfterGameDialog = false
+ 249 | 
+ 250 |     @State private var showWinnerPicker = false
+ 251 | 
+ 252 |     var body: some View {
+ 253 |         VStack(spacing: 12) {
+ 254 |             content
+ 255 |             Spacer()
+ 256 |         }
+ 257 |         .padding()
+ 258 |         .navigationTitle("Run Game")
+ 259 |         .toolbar {
+ 260 |             ToolbarItem(placement: .topBarTrailing) {
+ 261 |                 Button("Pick Game") { showPickNextGame = true }
+ 262 |             }
+ 263 |         }
+ 264 |         .sheet(isPresented: $showPickNextGame) {
+ 265 |             PickNextGameSheet(event: event) { selection, skipMode in
+ 266 |                 handlePick(selection: selection, skipMode: skipMode)
+ 267 |             }
+ 268 |         }
+ 269 |         .alert("Message", isPresented: $showMessage) {
+ 270 |             Button("OK", role: .cancel) { }
+ 271 |         } message: {
+ 272 |             Text(message ?? "Unknown error")
+ 273 |         }
+ 274 |     }
+ 275 | 
+ 276 |     // MARK: - Derived
+ 277 | 
+ 278 |     private var engine: EventEngine { EventEngine(context: context) }
+ 279 | 
+ 280 |     private var peopleById: [UUID: Person] {
+ 281 |         Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0) })
+ 282 |     }
+ 283 | 
+ 284 |     private var currentGame: EventGame? {
+ 285 |         guard let id = event.currentEventGameId else { return nil }
+ 286 |         return event.eventGames.first(where: { $0.id == id })
+ 287 |     }
+ 288 | 
+ 289 |     private var currentTemplate: GameTemplate? {
+ 290 |         guard let eg = currentGame else { return nil }
+ 291 |         return templates.first(where: { $0.id == eg.gameTemplateId })
+ 292 |     }
+ 293 | 
+ 294 |     private var currentRound: Round? {
+ 295 |         guard let eg = currentGame else { return nil }
+ 296 |         // Current round = the latest round that has not been completed.
+ 297 |         return eg.rounds
+ 298 |             .sorted(by: { $0.roundIndex > $1.roundIndex })
+ 299 |             .first(where: { $0.completedAt == nil })
+ 300 |     }
+ 301 | 
+ 302 |     private func teamLabel(_ index: Int) -> String {
+ 303 |         let scalar = UnicodeScalar(65 + index)!   // 0->A, 1->B, ...
+ 304 |         return String(Character(scalar))
+ 305 |     }
+ 306 | 
+ 307 |     private func teamNames(_ team: RoundTeam) -> String {
+ 308 |         team.memberPersonIds
+ 309 |             .compactMap { peopleById[$0]?.displayName }
+ 310 |             .joined(separator: ", ")
+ 311 |     }
+ 312 | 
+ 313 |     // MARK: - Content
+ 314 | 
+ 315 |     @ViewBuilder
+ 316 |     private var content: some View {
+ 317 |         if let eg = currentGame, let template = currentTemplate {
+ 318 |             header(template: template, eventGame: eg)
+ 319 |             if let round = currentRound {
+ 320 |                 roundCard(template: template, eventGame: eg, round: round)
+ 321 |             } else {
+ 322 |                 Text("No active round.").foregroundStyle(.secondary)
+ 323 |             }
+ 324 |         } else {
+ 325 |             emptyState
+ 326 |         }
+ 327 |     }
+ 328 | 
+ 329 |     private var emptyState: some View {
+ 330 |         VStack(spacing: 12) {
+ 331 |             Text("No game is currently running.")
+ 332 |                 .foregroundStyle(.secondary)
+ 333 | 
+ 334 |             Button("Start Event") {
+ 335 |                 do { try engine.startEvent(event) }
+ 336 |                 catch { show(error) }
+ 337 |             }
+ 338 |             .buttonStyle(.borderedProminent)
+ 339 |             .disabled(event.eventGames.isEmpty || event.participantIds.isEmpty)
+ 340 |         }
+ 341 |     }
+ 342 | 
+ 343 |     private func header(template: GameTemplate, eventGame: EventGame) -> some View {
+ 344 |         VStack(alignment: .leading, spacing: 8) {
+ 345 |             Text(template.name).font(.title2).bold()
+ 346 | 
+ 347 |             if let instructions = (eventGame.overrideInstructions ?? template.instructions),
+ 348 |                !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+ 349 |                 Text(instructions)
+ 350 |                     .foregroundStyle(.secondary)
+ 351 |             }
+ 352 | 
+ 353 |             HStack {
+ 354 |                 Text("Status: \(eventGame.statusRaw.capitalized)")
+ 355 |                     .foregroundStyle(.secondary)
+ 356 |                 Spacer()
+ 357 |                 Text("Players: \(event.participantIds.count)")
+ 358 |                     .foregroundStyle(.secondary)
+ 359 |             }
+ 360 |         }
+ 361 |     }
+ 362 | 
+ 363 |     private func roundCard(template: GameTemplate, eventGame: EventGame, round: Round) -> some View {
+ 364 |         VStack(alignment: .leading, spacing: 12) {
+ 365 |             HStack {
+ 366 |                 Text("Round \(round.roundIndex + 1)").font(.headline)
+ 367 |                 Spacer()
+ 368 |                 if round.isLocked { Text("Locked").foregroundStyle(.secondary) }
+ 369 |             }
+ 370 | 
+ 371 |             if round.teams.isEmpty {
+ 372 |                 Button("Generate Teams") {
+ 373 |                     do { try engine.generateTeams(for: round) }
+ 374 |                     catch { show(error) }
+ 375 |                 }
+ 376 |                 .buttonStyle(.borderedProminent)
+ 377 |             } else {
+ 378 |                 teamsList(round: round)
+ 379 | 
+ 380 |                 if !round.isLocked {
+ 381 |                     actionRowUnlocked(round: round)
+ 382 |                 } else {
+ 383 |                     Button("Continue") { showAfterRoundDialog = true }
+ 384 |                         .buttonStyle(.borderedProminent)
+ 385 |                 }
+ 386 | 
+ 387 |                 previousRoundsCompact(eventGame: eventGame)
+ 388 |             }
+ 389 |         }
+ 390 |         .sheet(isPresented: $showSwap) {
+ 391 |             SwapPlayerSheet(
+ 392 |                 event: event,
+ 393 |                 currentRound: round,
+ 394 |                 people: people,
+ 395 |                 outgoing: swapOutgoing
+ 396 |             ) { incoming in
+ 397 |                 do {
+ 398 |                     if let out = swapOutgoing {
+ 399 |                         try engine.swapPlayer(in: round, from: out, to: incoming)
+ 400 |                     }
+ 401 |                 } catch { show(error) }
+ 402 |             }
+ 403 |         }
+ 404 |         .confirmationDialog("Play another round of this game?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
+ 405 |             Button("Yes – New Round") {
+ 406 |                 do { _ = try engine.createNextRound(for: eventGame) }
+ 407 |                 catch { show(error) }
+ 408 |             }
+ 409 |             Button("No – Next Game") { showAfterGameDialog = true }
+ 410 |             Button("Cancel", role: .cancel) { }
+ 411 |         }
+ 412 |         .confirmationDialog("Next game", isPresented: $showAfterGameDialog, titleVisibility: .visible) {
+ 413 |             Button("Pick next game (random)") {
+ 414 |                 do {
+ 415 |                     try engine.completeGame(eventGame)
+ 416 |                     if let next = try engine.pickNextGameRandom(event: event) {
+ 417 |                         try engine.start(event: event, eventGame: next)
+ 418 |                     } else {
+ 419 |                         event.status = .completed
+ 420 |                         try context.save()
+ 421 |                     }
+ 422 |                 } catch { show(error) }
+ 423 |             }
+ 424 |             Button("Choose from list") { showPickNextGame = true }
+ 425 |             Button("Cancel", role: .cancel) { }
+ 426 |         }
+ 427 |     }
+ 428 | 
+ 429 |     private func teamsList(round: Round) -> some View {
+ 430 |         VStack(alignment: .leading, spacing: 10) {
+ 431 |             ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, team in
+ 432 |                 VStack(alignment: .leading, spacing: 6) {
+ 433 |                     Text("Team \(teamLabel(index))")
+ 434 |                         .font(.subheadline)
+ 435 |                         .bold()
+ 436 | 
+ 437 |                     ForEach(team.memberPersonIds, id: \.self) { pid in
+ 438 |                         HStack {
+ 439 |                             Text(peopleById[pid]?.displayName ?? "Unknown")
+ 440 |                             Spacer()
+ 441 |                             if !round.isLocked {
+ 442 |                                 Button("Swap") {
+ 443 |                                     swapOutgoing = pid
+ 444 |                                     showSwap = true
+ 445 |                                 }
+ 446 |                                 .buttonStyle(.bordered)
+ 447 |                             }
+ 448 |                         }
+ 449 |                     }
+ 450 |                 }
+ 451 |                 .padding(.vertical, 6)
+ 452 |             }
+ 453 |         }
+ 454 |     }
+ 455 | 
+ 456 |     private func actionRowUnlocked(round: Round) -> some View {
+ 457 |         HStack {
+ 458 |             Button("Regenerate") {
+ 459 |                 do { try engine.generateTeams(for: round) }
+ 460 |                 catch { show(error) }
+ 461 |             }
+ 462 |             .buttonStyle(.bordered)
+ 463 | 
+ 464 |             Spacer()
+ 465 | 
+ 466 |             Button("Select Winner") {
+ 467 |                 showWinnerPicker = true
+ 468 |             }
+ 469 |             .buttonStyle(.borderedProminent)
+ 470 |             .disabled(round.teams.isEmpty)
+ 471 |         }
+ 472 |         // Reliable downward presentation (vs Menu which can pop up/down based on space)
+ 473 |         .confirmationDialog("Select winner", isPresented: $showWinnerPicker, titleVisibility: .visible) {
+ 474 |             ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
+ 475 |                 Button("Team \(teamLabel(index)) — \(teamNames(t))") {
+ 476 |                     do {
+ 477 |                         try engine.finalizeRound(round, winnerTeamId: t.id)
+ 478 |                         showAfterRoundDialog = true
+ 479 |                     } catch { show(error) }
+ 480 |                 }
+ 481 |             }
+ 482 | 
+ 483 |             Button("Tie") {
+ 484 |                 do {
+ 485 |                     try engine.finalizeRound(round, winnerTeamId: nil)
+ 486 |                     showAfterRoundDialog = true
+ 487 |                 } catch { show(error) }
+ 488 |             }
+ 489 | 
+ 490 |             Button("Cancel", role: .cancel) { }
+ 491 |         }
+ 492 |     }
+ 493 | 
+ 494 |     private func previousRoundsCompact(eventGame: EventGame) -> some View {
+ 495 |         let completed = eventGame.rounds
+ 496 |             .sorted { $0.roundIndex > $1.roundIndex }
+ 497 |             .filter { $0.completedAt != nil }
+ 498 | 
+ 499 |         return Group {
+ 500 |             if !completed.isEmpty {
+ 501 |                 Divider()
+ 502 |                 Text("Previous Rounds").font(.subheadline).bold()
+ 503 |                 ForEach(completed.prefix(3)) { r in
+ 504 |                     Text(historyLine(r))
+ 505 |                         .font(.footnote)
+ 506 |                         .foregroundStyle(.secondary)
+ 507 |                 }
+ 508 |             }
+ 509 |         }
+ 510 |     }
+ 511 | 
+ 512 |     private func historyLine(_ round: Round) -> String {
+ 513 |         if round.resultType == .tie {
+ 514 |             return "Round \(round.roundIndex + 1): Tie"
+ 515 |         }
+ 516 |         if let winTeam = round.winningTeamId,
+ 517 |            let team = round.teams.first(where: { $0.id == winTeam }) {
+ 518 |             let names = team.memberPersonIds
+ 519 |                 .compactMap { peopleById[$0]?.displayName }
+ 520 |                 .joined(separator: ", ")
+ 521 |             return "Round \(round.roundIndex + 1): Winner – \(names)"
+ 522 |         }
+ 523 |         return "Round \(round.roundIndex + 1): Completed"
+ 524 |     }
+ 525 | 
+ 526 |     // MARK: - Pick game handling
+ 527 | 
+ 528 |     private func handlePick(selection: EventGame, skipMode: PickNextGameSheet.SkipMode?) {
+ 529 |         do {
+ 530 |             if let skipMode {
+ 531 |                 if skipMode == .pushLater { try engine.pushGameToLater(selection) }
+ 532 |                 if skipMode == .remove { try engine.removeGameFromEvent(selection) }
+ 533 |                 return
+ 534 |             }
+ 535 | 
+ 536 |             if let cg = currentGame { try engine.completeGame(cg) }
+ 537 |             try engine.start(event: event, eventGame: selection)
+ 538 |         } catch {
+ 539 |             show(error)
+ 540 |         }
+ 541 |     }
+ 542 | 
+ 543 |     private func show(_ error: Error) {
+ 544 |         message = error.localizedDescription
+ 545 |         showMessage = true
+ 546 |     }
+ 547 | }
+ 548 | 
+ 549 | 
+ 550 | 
+ 551 | // MARK: - Pick Next Game
+ 552 | 
+ 553 | private struct PickNextGameSheet: View {
+ 554 |     enum SkipMode { case pushLater, remove }
+ 555 | 
+ 556 |     @Environment(\.dismiss) private var dismiss
+ 557 | 
+ 558 |     let event: Event
+ 559 |     let onPick: (EventGame, SkipMode?) -> Void
+ 560 | 
+ 561 |     @Query(sort: \GameTemplate.name)
+ 562 |     private var templates: [GameTemplate]
+ 563 | 
+ 564 |     var body: some View {
+ 565 |         NavigationStack {
+ 566 |             List {
+ 567 |                 Section("Eligible (not started)") {
+ 568 |                     ForEach(eligibleGames) { eg in
+ 569 |                         Button {
+ 570 |                             onPick(eg, nil)
+ 571 |                             dismiss()
+ 572 |                         } label: {
+ 573 |                             gameRow(for: eg)
+ 574 |                         }
+ 575 |                     }
+ 576 |                 }
+ 577 | 
+ 578 |                 Section("Skip options") {
+ 579 |                     ForEach(eligibleGames) { eg in
+ 580 |                         Menu {
+ 581 |                             Button("Push to later") {
+ 582 |                                 onPick(eg, .pushLater)
+ 583 |                                 dismiss()
+ 584 |                             }
+ 585 |                             Button("Remove from event", role: .destructive) {
+ 586 |                                 onPick(eg, .remove)
+ 587 |                                 dismiss()
+ 588 |                             }
+ 589 |                         } label: {
+ 590 |                             Text("Skip \(gameName(for: eg))")
+ 591 |                         }
+ 592 |                     }
+ 593 |                 }
+ 594 |             }
+ 595 |             .navigationTitle("Choose Next Game")
+ 596 |             .toolbar {
+ 597 |                 ToolbarItem(placement: .topBarLeading) {
+ 598 |                     Button("Close") { dismiss() }
+ 599 |                 }
+ 600 |             }
+ 601 |         }
+ 602 |     }
+ 603 | 
+ 604 |     // MARK: - Helpers
+ 605 | 
+ 606 |     private var eligibleGames: [EventGame] {
+ 607 |         event.eventGames
+ 608 |             .filter { $0.status == .notStarted }
+ 609 |             .sorted { $0.orderIndex < $1.orderIndex }
+ 610 |     }
+ 611 | 
+ 612 |     private func template(for eg: EventGame) -> GameTemplate? {
+ 613 |         templates.first(where: { $0.id == eg.gameTemplateId })
+ 614 |     }
+ 615 | 
+ 616 |     private func gameName(for eg: EventGame) -> String {
+ 617 |         template(for: eg)?.name ?? "Unknown Game"
+ 618 |     }
+ 619 | 
+ 620 |     private func gameRow(for eg: EventGame) -> some View {
+ 621 |         let t = template(for: eg)
+ 622 | 
+ 623 |         let name = t?.name ?? "Unknown Game"
+ 624 |         let group = t?.groupName?.trimmingCharacters(in: .whitespacesAndNewlines)
+ 625 |         let groupText = (group?.isEmpty == false) ? group! : nil
+ 626 | 
+ 627 |         // Prefer per-game overrides, otherwise fall back to template defaults
+ 628 |         let teamCount = eg.overrideTeamCount ?? t?.defaultTeamCount ?? 2
+ 629 |         let playersPerTeam = eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam ?? 2
+ 630 | 
+ 631 |         let teamSizeText = "Teams: \(teamCount) × \(playersPerTeam)"
+ 632 |         let subtitle = groupText != nil ? "\(groupText!) • \(teamSizeText)" : teamSizeText
+ 633 | 
+ 634 |         return VStack(alignment: .leading, spacing: 3) {
+ 635 |             Text(name)
+ 636 |                 .font(.body)
+ 637 | 
+ 638 |             Text(subtitle)
+ 639 |                 .font(.footnote)
+ 640 |                 .foregroundStyle(.secondary)
+ 641 |         }
+ 642 |     }
+ 643 | }
+ 644 | 
+ 645 | 
+ 646 | // MARK: - Swap Player
+ 647 | 
+ 648 | private struct SwapPlayerSheet: View {
+ 649 |     @Environment(\.dismiss) private var dismiss
+ 650 | 
+ 651 |     let event: Event
+ 652 |     let currentRound: Round
+ 653 |     let people: [Person]
+ 654 |     let outgoing: UUID?
+ 655 | 
+ 656 |     let onSwap: (UUID) -> Void
+ 657 | 
+ 658 |     var body: some View {
+ 659 |         let inRound = Set(currentRound.teams.flatMap { $0.memberPersonIds })
+ 660 |         let bench = people.filter { event.participantIds.contains($0.id) && !inRound.contains($0.id) && $0.isActive }
+ 661 | 
+ 662 |         NavigationStack {
+ 663 |             List {
+ 664 |                 Section {
+ 665 |                     Text("Outgoing: \(name(outgoing))")
+ 666 |                         .foregroundStyle(.secondary)
+ 667 |                 }
+ 668 | 
+ 669 |                 Section("Choose replacement") {
+ 670 |                     ForEach(bench) { p in
+ 671 |                         Button(p.displayName) {
+ 672 |                             onSwap(p.id)
+ 673 |                             dismiss()
+ 674 |                         }
+ 675 |                     }
+ 676 |                 }
+ 677 |             }
+ 678 |             .navigationTitle("Swap Player")
+ 679 |             .toolbar {
+ 680 |                 ToolbarItem(placement: .topBarLeading) {
+ 681 |                     Button("Cancel") { dismiss() }
+ 682 |                 }
+ 683 |             }
+ 684 |         }
+ 685 |     }
+ 686 | 
+ 687 |     private func name(_ id: UUID?) -> String {
+ 688 |         guard let id else { return "None" }
+ 689 |         return people.first(where: { $0.id == id })?.displayName ?? "Unknown"
+ 690 |     }
+ 691 | }
+ 692 | 
+ 693 | 
+ 694 | // MARK: - Add Event
+ 695 | 
+ 696 | private struct AddEventSheet: View {
+ 697 |     @Environment(\.dismiss) private var dismiss
+ 698 |     @Environment(\.modelContext) private var context
+ 699 |     @State private var name = ""
+ 700 | 
+ 701 |     var body: some View {
+ 702 |         NavigationStack {
+ 703 |             Form {
+ 704 |                 TextField("Event Name", text: $name)
+ 705 |             }
+ 706 |             .navigationTitle("New Event")
+ 707 |             .toolbar {
+ 708 |                 ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+ 709 |                 ToolbarItem(placement: .topBarTrailing) {
+ 710 |                     Button("Save") { save() }
+ 711 |                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+ 712 |                 }
+ 713 |             }
+ 714 |         }
+ 715 |     }
+ 716 | 
+ 717 |     private func save() {
+ 718 |         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+ 719 |         guard !trimmed.isEmpty else { return }
+ 720 |         context.insert(Event(name: trimmed))
+ 721 |         try? context.save()
+ 722 |         dismiss()
+ 723 |     }
+ 724 | }
+ 725 | 
+ 726 | 
+ 727 | // MARK: - Add Games
+ 728 | private struct AddGameToEventSheet: View {
+ 729 |     @Environment(\.dismiss) private var dismiss
+ 730 |     @Environment(\.modelContext) private var context
+ 731 | 
+ 732 |     let event: Event
+ 733 | 
+ 734 |     @Query(sort: \GameTemplate.name)
+ 735 |     private var templates: [GameTemplate]
+ 736 | 
+ 737 |     @State private var selectedIds: Set<UUID> = []
+ 738 |     @State private var showCSVImporter = false
+ 739 |     @State private var showCreateTemplate = false
+ 740 | 
+ 741 |     @State private var alertTitle = "Message"
+ 742 |     @State private var alertMessage: String?
+ 743 |     @State private var showAlert = false
+ 744 | 
+ 745 |     @State private var pendingCSVData: Data?
+ 746 |     @State private var pendingCSVFilename: String?
+ 747 |     @State private var showCSVPreview = false
+ 748 | 
+ 749 |     var body: some View {
+ 750 |         NavigationStack {
+ 751 |             List(selection: $selectedIds) {
+ 752 |                 Section("Select games to add") {
+ 753 |                     ForEach(templates) { t in
+ 754 |                         HStack {
+ 755 |                             Text(t.name)
+ 756 |                             Spacer()
+ 757 |                             if alreadyInEvent(t) {
+ 758 |                                 Text("Added")
+ 759 |                                     .font(.footnote)
+ 760 |                                     .foregroundStyle(.secondary)
+ 761 |                             }
+ 762 |                         }
+ 763 |                         .tag(t.id)
+ 764 |                         .contentShape(Rectangle())
+ 765 |                     }
+ 766 |                 }
+ 767 |             }
+ 768 |             .environment(\.editMode, .constant(.active))
+ 769 |             .navigationTitle("Add Games")
+ 770 |             .toolbar {
+ 771 |                 ToolbarItem(placement: .topBarLeading) {
+ 772 |                     Button("Cancel") { dismiss() }
+ 773 |                 }
+ 774 | 
+ 775 |                 ToolbarItem(placement: .topBarTrailing) {
+ 776 |                     Button("Add (\(selectedAddableCount))") { addSelected() }
+ 777 |                         .disabled(selectedAddableCount == 0)
+ 778 |                 }
+ 779 | 
+ 780 |                 ToolbarItem(placement: .bottomBar) {
+ 781 |                     HStack {
+ 782 |                         Button("Select All") { selectedIds = Set(templates.map { $0.id }) }
+ 783 |                             .disabled(templates.isEmpty)
+ 784 | 
+ 785 |                         Button("None") { selectedIds.removeAll() }
+ 786 |                             .disabled(selectedIds.isEmpty)
+ 787 | 
+ 788 |                         Spacer()
+ 789 | 
+ 790 |                         Button("Import CSV") { showCSVImporter = true }
+ 791 |                         Button("New Template") { showCreateTemplate = true }
+ 792 |                     }
+ 793 |                 }
+ 794 |             }
+ 795 |             .fileImporter(
+ 796 |                 isPresented: $showCSVImporter,
+ 797 |                 allowedContentTypes: [UTType.commaSeparatedText],
+ 798 |                 allowsMultipleSelection: false
+ 799 |             ) { result in
+ 800 |                 do {
+ 801 |                     let urls = try result.get()
+ 802 |                     guard let url = urls.first else { return }
+ 803 | 
+ 804 |                     let didStart = url.startAccessingSecurityScopedResource()
+ 805 |                     defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+ 806 | 
+ 807 |                     let data = try Data(contentsOf: url)
+ 808 | 
+ 809 |                     pendingCSVData = data
+ 810 |                     pendingCSVFilename = url.lastPathComponent
+ 811 |                     showCSVPreview = true
+ 812 | 
+ 813 |                 } catch {
+ 814 |                     alertTitle = "Import failed"
+ 815 |                     alertMessage = error.localizedDescription
+ 816 |                     showAlert = true
+ 817 |                 }
+ 818 |             }
+ 819 |             .sheet(isPresented: $showCSVPreview) {
+ 820 |                 if let data = pendingCSVData {
+ 821 |                     CSVImportPreviewSheet(csvData: data, filename: pendingCSVFilename)
+ 822 |                 } else {
+ 823 |                     Text("No CSV loaded.")
+ 824 |                         .padding()
+ 825 |                 }
+ 826 |             }
+ 827 |             .sheet(isPresented: $showCreateTemplate) {
+ 828 |                 CreateGameTemplateSheet { newTemplate in
+ 829 |                     selectedIds.insert(newTemplate.id)
+ 830 |                 }
+ 831 |             }
+ 832 |             .alert(alertTitle, isPresented: $showAlert) {
+ 833 |                 Button("OK", role: .cancel) { }
+ 834 |             } message: {
+ 835 |                 Text(alertMessage ?? "Unknown error")
+ 836 |             }
+ 837 |         }
+ 838 |     }
+ 839 | 
+ 840 |     private func alreadyInEvent(_ template: GameTemplate) -> Bool {
+ 841 |         event.eventGames.contains(where: { $0.gameTemplateId == template.id })
+ 842 |     }
+ 843 | 
+ 844 |     private var selectedAddableCount: Int {
+ 845 |         let existing = Set(event.eventGames.map { $0.gameTemplateId })
+ 846 |         return selectedIds.filter { !existing.contains($0) }.count
+ 847 |     }
+ 848 | 
+ 849 |     private func addSelected() {
+ 850 |         let existing = Set(event.eventGames.map { $0.gameTemplateId })
+ 851 |         var nextOrder = (event.eventGames.map(\.orderIndex).max() ?? -1) + 1
+ 852 | 
+ 853 |         for tid in selectedIds {
+ 854 |             guard !existing.contains(tid) else { continue }
+ 855 |             let eg = EventGame(event: event, gameTemplateId: tid, orderIndex: nextOrder, status: .notStarted)
+ 856 |             nextOrder += 1
+ 857 |             context.insert(eg)
+ 858 |             event.eventGames.append(eg)
+ 859 |         }
+ 860 | 
+ 861 |         do {
+ 862 |             try context.save()
+ 863 |             dismiss()
+ 864 |         } catch {
+ 865 |             alertTitle = "Add failed"
+ 866 |             alertMessage = error.localizedDescription
+ 867 |             showAlert = true
+ 868 |         }
+ 869 |     }
+ 870 | }
+ 871 | 
+ 872 | 
+ 873 | // MARK: - Players + Add Games sheets
+ 874 | // IMPORTANT: Keep your existing working implementations for SelectEventPlayersSheet and AddGameToEventSheet.
+ 875 | // If you want, I can paste those two again as full, consistent blocks in the next message.
+
+
+END FILE: ./ContentView.swift
+
+

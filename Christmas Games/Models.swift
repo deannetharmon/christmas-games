@@ -37,10 +37,15 @@ final class Person {
     var sex: String?
     var spouseId: UUID?
 
+    // Detailed (used by CSV import, FairnessEngine)
     var age: Int?
     var weight: Int?
     var athleticAbility: Int?
     var height: String?
+
+    // Categories (used by simple UI)
+    var weightCategory: String?   // "S", "M", "L"
+    var heightCategory: String?   // "S", "M", "L"
 
     var isActive: Bool
 
@@ -53,6 +58,8 @@ final class Person {
         weight: Int? = nil,
         athleticAbility: Int? = nil,
         height: String? = nil,
+        weightCategory: String? = nil,
+        heightCategory: String? = nil,
         isActive: Bool = true
     ) {
         self.id = id
@@ -63,6 +70,8 @@ final class Person {
         self.weight = weight
         self.athleticAbility = athleticAbility
         self.height = height
+        self.weightCategory = weightCategory
+        self.heightCategory = heightCategory
         self.isActive = isActive
     }
 }
@@ -184,12 +193,10 @@ final class EventGame {
 
     var overrideTeamCount: Int?
     var overridePlayersPerTeam: Int?
-    var overrideRoundsPerGame: Int? // used as a suggestion; you can keep adding rounds
+    var overrideRoundsPerGame: Int?
     var overrideTeamTypeRaw: String?
     var overrideInstructions: String?
 
-    /// Optional host override to force specific players into specific teams.
-    /// Stored as JSON-encoded [[UUID]] where each inner array is one team.
     var overrideTeamPlayersData: Data?
 
     @Relationship(deleteRule: .cascade, inverse: \Round.eventGame)
@@ -267,10 +274,7 @@ final class Round {
     var createdAt: Date
     var completedAt: Date?
 
-    /// Teams stored
     var teamsData: Data
-
-    /// Individual placements stored: [personId: placement] (1 = first, 2 = second)
     var placementsData: Data
 
     var resultTypeRaw: String?

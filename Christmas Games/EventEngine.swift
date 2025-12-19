@@ -79,9 +79,53 @@ final class EventEngine {
         try context.save()
     }
 
-    // MARK: - Start / Progression
+    // MARK: - Skip Current Game
+    
+    /// Skip current game and start a new random game, keeping same players
+    func skipToNextGame(_ currentGame: EventGame, keepingPlayers playerIds: [UUID]) throws {
+        guard let event = currentGame.event else { return }
+        
+        // Mark current game as completed (skipped)
+        currentGame.status = .completed
+        
+        // Pick next random game
+        guard let nextGame = try pickNextGameRandom(event: event) else {
+            // No more games available
+            event.status = .completed
+            event.currentEventGameId = nil
+            touch(event)
+            try context.save()
+            return
+        }
+        
+        // Start the new game
+        event.status = .active
+        event.currentEventGameId = nextGame.id
+        nextGame.status = .inProgress
+        
+        // Create round 0 if none exist
+        if nextGame.rounds.isEmpty {
+            let r = Round(eventGame: nextGame, roundIndex: 0, teams: [])
+            context.insert(r)
+            nextGame.rounds.append(r)
+        }
+        
+        // Generate teams with preferred players
+        if let currentRound = nextGame.rounds.first(where: { $0.completedAt == nil }) {
+            let fairness = FairnessEngine(context: context)
+            let teams = try fairness.generateTeamsWithPreferredPlayers(
+                for: currentRound,
+                in: event,
+                preferredPlayers: playerIds
+            )
+            currentRound.teams = teams
+        }
+        
+        touch(event)
+        try context.save()
+    }
 
-    // MARK: - Event Lifecycle (used by ContentView)
+    // MARK: - Event Lifecycle
 
     func startEvent(_ event: Event) throws {
         // Starting the event means: mark active and immediately start the next game.
@@ -103,6 +147,26 @@ final class EventEngine {
         try context.save()
     }
 
+    // MARK: - Reset Event
+
+func resetEvent(_ event: Event) throws {
+    // Delete all rounds from all games
+    for eventGame in event.eventGames {
+        for round in eventGame.rounds {
+            context.delete(round)
+        }
+        eventGame.rounds.removeAll()
+        eventGame.status = .notStarted
+    }
+    
+    // Reset event state
+    event.status = .available
+    event.currentEventGameId = nil
+    
+    touch(event)
+    try context.save()
+}
+    
     func resumeEvent(_ event: Event) throws {
         guard !event.participantIds.isEmpty else { throw StartError.noParticipants }
 
@@ -138,7 +202,7 @@ final class EventEngine {
         }
 
         // Resolve template to know defaultRoundsPerGame
-        guard let template = try fetchTemplate(id: eventGame.gameTemplateId) else {
+        guard try fetchTemplate(id: eventGame.gameTemplateId) != nil else {
             throw StartError.missingTemplate
         }
 
@@ -146,9 +210,11 @@ final class EventEngine {
         event.currentEventGameId = eventGame.id
         eventGame.status = .inProgress
 
-        // Create round 0 only if none exist
-        if eventGame.rounds.isEmpty {
-            let r = Round(eventGame: eventGame, roundIndex: 0, teams: [])
+        // Create round 0 if no rounds exist, OR if all rounds are completed
+        let hasActiveRound = eventGame.rounds.contains { $0.completedAt == nil }
+        if eventGame.rounds.isEmpty || !hasActiveRound {
+            let nextIndex = eventGame.rounds.map(\.roundIndex).max().map { $0 + 1 } ?? 0
+            let r = Round(eventGame: eventGame, roundIndex: nextIndex, teams: [])
             context.insert(r)
             eventGame.rounds.append(r)
         }
@@ -156,8 +222,8 @@ final class EventEngine {
         touch(event)
         try context.save()
     }
-
-    // MARK: - Game / Round progression (used by ContentView)
+    
+    // MARK: - Game / Round progression
 
     func createNextRound(for eventGame: EventGame) throws -> Round {
         let nextIndex = eventGame.rounds.map(\.roundIndex).max().map { $0 + 1 } ?? 0
@@ -264,21 +330,42 @@ final class EventEngine {
     }
 
     func finalizeRound(_ round: Round, winnerTeamId: UUID?) throws {
-        round.completedAt = Date()
+    round.completedAt = Date()
 
-        if let winnerTeamId {
-            round.resultType = .win
-            round.winningTeamId = winnerTeamId
-        } else {
-            round.resultType = .tie
-            round.winningTeamId = nil
+    // Calculate placements for all participants
+    var placements: [UUID: Int] = [:]
+    
+    if let winnerTeamId {
+        // Winner case
+        round.resultType = .win
+        round.winningTeamId = winnerTeamId
+        
+        // Assign placements
+        for team in round.teams {
+            let placement = (team.id == winnerTeamId) ? 1 : 2
+            for personId in team.memberPersonIds {
+                placements[personId] = placement
+            }
         }
-
-        if let event = round.eventGame?.event {
-            touch(event)
+    } else {
+        // Tie case - everyone gets 1st place
+        round.resultType = .tie
+        round.winningTeamId = nil
+        
+        for team in round.teams {
+            for personId in team.memberPersonIds {
+                placements[personId] = 1
+            }
         }
-        try context.save()
     }
+    
+    round.placements = placements
+
+    if let event = round.eventGame?.event {
+        touch(event)
+    }
+    try context.save()
+}
 
     // MARK: - Helpers
 

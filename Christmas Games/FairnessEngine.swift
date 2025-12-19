@@ -24,11 +24,17 @@ final class FairnessEngine {
             throw FairnessError.notEnoughPlayers(required: required, available: eligiblePeople.count)
         }
 
-        // Choose participants for this round based on "equal playing time" = rounds played (completed rounds)
+        // Detect if this is a regeneration (teams already exist)
+        let currentPlayerIds = Set(round.teams.flatMap { $0.memberPersonIds })
+        let isRegeneration = !currentPlayerIds.isEmpty
+
+        // Choose participants for this round based on "equal playing time"
+        // If regenerating, try to exclude current players to force rotation
         let chosen = chooseParticipants(
             eligible: eligiblePeople,
             required: required,
-            event: event
+            event: event,
+            excluding: isRegeneration ? currentPlayerIds : []
         )
 
         if settings.teamType == .couplesOnly {
@@ -50,7 +56,100 @@ final class FairnessEngine {
                 teams: teams,
                 peopleById: Dictionary(uniqueKeysWithValues: chosen.map { ($0.id, $0) }),
                 historySignatures: historySignatures,
-                allowSpousesSameTeam: false // unless couplesOnly
+                allowSpousesSameTeam: false
+            )
+
+            if score < bestScore {
+                bestScore = score
+                best = teams
+                if score == 0 { break }
+            }
+        }
+
+        return best
+    }
+
+    /// Generate teams with a preferred set of players (used for skipping games)
+    func generateTeamsWithPreferredPlayers(
+        for round: Round,
+        in event: Event,
+        preferredPlayers: [UUID]
+    ) throws -> [RoundTeam] {
+
+        guard let eventGame = round.eventGame else {
+            throw FairnessError.missingEventGame
+        }
+
+        let settings = try effectiveSettings(for: eventGame)
+        let required = settings.teamCount * settings.playersPerTeam
+
+        let eligiblePeople = try fetchEligiblePeople(for: event)
+        let eligibleIds = Set(eligiblePeople.map { $0.id })
+
+        // Filter preferred players to only those who are eligible
+        let validPreferred = preferredPlayers.filter { eligibleIds.contains($0) }
+
+        // Adjust player count if needed
+        let chosen: [Person]
+        if validPreferred.count == required {
+            // Perfect match - use as-is
+            chosen = validPreferred.compactMap { id in eligiblePeople.first(where: { $0.id == id }) }
+        } else if validPreferred.count < required {
+            // Need more players - add from bench by fairness
+            let playedCounts = roundsPlayedCounts(event: event)
+            let benchPlayers = eligiblePeople.filter { !validPreferred.contains($0.id) }
+            let additionalNeeded = required - validPreferred.count
+
+            let additional = benchPlayers
+                .sorted {
+                    let a = playedCounts[$0.id, default: 0]
+                    let b = playedCounts[$1.id, default: 0]
+                    if a != b { return a < b }
+                    return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+                }
+                .prefix(additionalNeeded)
+
+            let preferredPeople = validPreferred.compactMap { id in eligiblePeople.first(where: { $0.id == id }) }
+            chosen = preferredPeople + additional
+        } else {
+            // Too many players - remove by most playing time
+            let playedCounts = roundsPlayedCounts(event: event)
+            chosen = validPreferred
+                .compactMap { id in eligiblePeople.first(where: { $0.id == id }) }
+                .sorted {
+                    let a = playedCounts[$0.id, default: 0]
+                    let b = playedCounts[$1.id, default: 0]
+                    if a != b { return a < b } // Keep those with LESS playing time
+                    return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+                }
+                .prefix(required)
+                .map { $0 }
+        }
+
+        guard chosen.count == required else {
+            throw FairnessError.notEnoughPlayers(required: required, available: chosen.count)
+        }
+
+        if settings.teamType == .couplesOnly {
+            return try generateCouplesOnlyTeams(teamCount: settings.teamCount, eligible: chosen)
+        }
+
+        // Generate candidate partitions and pick best by score
+        let historySignatures = matchupSignaturesForGame(eventGame: eventGame)
+
+        let candidates = 600
+        var best: [RoundTeam] = []
+        var bestScore = Double.greatestFiniteMagnitude
+
+        for _ in 0..<candidates {
+            let shuffled = chosen.shuffled().map { $0.id }
+            let teams = partition(ids: shuffled, teamCount: settings.teamCount, playersPerTeam: settings.playersPerTeam)
+
+            let score = scoreTeams(
+                teams: teams,
+                peopleById: Dictionary(uniqueKeysWithValues: chosen.map { ($0.id, $0) }),
+                historySignatures: historySignatures,
+                allowSpousesSameTeam: false
             )
 
             if score < bestScore {
@@ -72,7 +171,6 @@ final class FairnessEngine {
     }
 
     private func effectiveSettings(for eventGame: EventGame) throws -> Settings {
-        // Resolve template to get defaults
         let t = try fetchTemplate(id: eventGame.gameTemplateId)
 
         let teamCount = eventGame.overrideTeamCount ?? t?.defaultTeamCount ?? 2
@@ -84,9 +182,20 @@ final class FairnessEngine {
 
     // MARK: - Participant choice (equal playing time by rounds played)
 
-    private func chooseParticipants(eligible: [Person], required: Int, event: Event) -> [Person] {
+    private func chooseParticipants(
+        eligible: [Person],
+        required: Int,
+        event: Event,
+        excluding: Set<UUID> = []
+    ) -> [Person] {
         let playedCounts = roundsPlayedCounts(event: event)
-        return eligible
+
+        // Try to exclude current players if there are enough non-excluded players
+        let nonExcluded = eligible.filter { !excluding.contains($0.id) }
+
+        let pool = nonExcluded.count >= required ? nonExcluded : eligible
+
+        return pool
             .sorted {
                 let a = playedCounts[$0.id, default: 0]
                 let b = playedCounts[$1.id, default: 0]
@@ -144,7 +253,7 @@ final class FairnessEngine {
 
         var score: Double = 0
 
-        // 1) Prevent repeating the exact head-to-head matchup (B)
+        // 1) Prevent repeating the exact head-to-head matchup
         let sig = matchupSignature(teams: teams)
         if historySignatures.contains(sig) {
             score += 10_000
@@ -163,7 +272,6 @@ final class FairnessEngine {
         }
 
         // 3) Balance by athleticAbility / weight / age (if available)
-        // Penalty based on variance between team totals.
         func teamStat(_ team: RoundTeam, get: (Person) -> Int?) -> Double {
             let vals = team.memberPersonIds.compactMap { peopleById[$0] }.compactMap(get)
             if vals.isEmpty { return 0 }

@@ -3,24 +3,19 @@ import SwiftData
 
 enum SeedData {
 
-    /// Upserts the full roster and removes legacy placeholders.
-    /// Safe to run multiple times.
     @MainActor
     static func seedOrUpdateRoster(context: ModelContext) throws {
 
-        // Fetch all existing people
         let existing = try context.fetch(FetchDescriptor<Person>())
         var byName: [String: Person] =
             Dictionary(uniqueKeysWithValues: existing.map { ($0.displayName, $0) })
 
-        // MARK: - Remove legacy placeholder people
         let legacyNamesToDelete: Set<String> = ["Couple2-A", "Couple2-B"]
         for person in existing where legacyNamesToDelete.contains(person.displayName) {
             context.delete(person)
             byName[person.displayName] = nil
         }
 
-        // MARK: - Upsert helper
         @discardableResult
         func upsert(
             _ name: String,
@@ -32,16 +27,19 @@ enum SeedData {
         ) -> Person {
 
             if let p = byName[name] {
-                // Update existing record
                 p.sex = sex
                 p.age = age
                 p.weight = weight
                 p.athleticAbility = athleticAbility
                 p.height = height
                 p.isActive = true
+                
+                // Set categories from detailed values
+                p.weightCategory = categoryForWeight(weight)
+                p.heightCategory = categoryForHeight(height)
+                
                 return p
             } else {
-                // Insert new record
                 let p = Person(
                     displayName: name,
                     sex: sex,
@@ -49,6 +47,8 @@ enum SeedData {
                     weight: weight,
                     athleticAbility: athleticAbility,
                     height: height,
+                    weightCategory: categoryForWeight(weight),
+                    heightCategory: categoryForHeight(height),
                     isActive: true
                 )
                 context.insert(p)
@@ -56,8 +56,6 @@ enum SeedData {
                 return p
             }
         }
-
-        // MARK: - Roster (from your sheet)
 
         let dean     = upsert("Dean",     sex: "M", age: 60, weight: 250, athleticAbility: 3, height: #"6'3""#)
         let shannon  = upsert("Shannon",  sex: "F", age: 57, weight: 150, athleticAbility: 4, height: #"6'"#)
@@ -74,8 +72,6 @@ enum SeedData {
         let hunter   = upsert("Hunter",   sex: "M", age: 27, weight: 260, athleticAbility: 5, height: #"6'5""#)
         let brooke   = upsert("Brooke",   sex: "F", age: 24, weight: 140, athleticAbility: 5, height: #"5'10""#)
 
-        // MARK: - Spouse linking (bidirectional)
-
         func linkSpouses(_ a: Person, _ b: Person) {
             a.spouseId = b.id
             b.spouseId = a.id
@@ -88,5 +84,33 @@ enum SeedData {
         linkSpouses(hunter, brooke)
 
         try context.save()
+    }
+    
+    // MARK: - Category Mapping
+    
+    private static func categoryForWeight(_ weight: Int) -> String {
+        switch weight {
+        case ..<160: return "S"
+        case 160..<220: return "M"
+        default: return "L"
+        }
+    }
+    
+    private static func categoryForHeight(_ height: String) -> String {
+        // Parse height like "6'3"" → inches
+        let components = height.replacingOccurrences(of: "\"", with: "").split(separator: "'")
+        guard components.count == 2,
+              let feet = Int(components[0]),
+              let inches = Int(components[1]) else {
+            return "M" // Default
+        }
+        
+        let totalInches = (feet * 12) + inches
+        
+        switch totalInches {
+        case ..<67: return "S"  // < 5'7"
+        case 67..<73: return "M" // 5'7" - 6'0"
+        default: return "L"      // > 6'0"
+        }
     }
 }
