@@ -11,6 +11,10 @@ struct EventStatsView: View {
     private var people: [Person]
 
     @State private var selectedEventId: UUID?
+    
+    @State private var showResetConfirm = false
+    @State private var message: String?
+    @State private var showMessage = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,6 +31,27 @@ struct EventStatsView: View {
             }
         }
         .navigationTitle("Event Stats")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Reset") {
+                    showResetConfirm = true
+                }
+                .disabled(selectedEventId == nil)
+            }
+        }
+        .confirmationDialog("Reset Event", isPresented: $showResetConfirm, titleVisibility: .visible) {
+            Button("Reset Event", role: .destructive) {
+                resetSelectedEvent()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will reset all games to 'not started', delete all rounds and statistics. Participants will be kept.")
+        }
+        .alert("Message", isPresented: $showMessage) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(message ?? "Unknown error")
+        }
     }
 
     private var eventPicker: some View {
@@ -145,6 +170,22 @@ struct EventStatsView: View {
                 }
                 .font(.body)
             }
+        }
+    }
+    
+    private func resetSelectedEvent() {
+        guard let selectedEventId,
+              let event = allEvents.first(where: { $0.id == selectedEventId }) else {
+            return
+        }
+        
+        do {
+            try EventEngine(context: context).resetEvent(event)
+            message = "Event '\(event.name)' has been reset successfully."
+            showMessage = true
+        } catch {
+            message = error.localizedDescription
+            showMessage = true
         }
     }
 }

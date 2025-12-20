@@ -228,6 +228,7 @@ func resetEvent(_ event: Event) throws {
     func createNextRound(for eventGame: EventGame) throws -> Round {
         let nextIndex = eventGame.rounds.map(\.roundIndex).max().map { $0 + 1 } ?? 0
         let r = Round(eventGame: eventGame, roundIndex: nextIndex, teams: [])
+        r.eventGame = eventGame  // Explicitly set inverse relationship
         context.insert(r)
         eventGame.rounds.append(r)
 
@@ -370,8 +371,9 @@ func resetEvent(_ event: Event) throws {
     // MARK: - Helpers
 
     private func fetchTemplate(id: UUID) throws -> GameTemplate? {
-        let d = FetchDescriptor<GameTemplate>(predicate: #Predicate { $0.id == id })
-        return try context.fetch(d).first
+        let descriptor = FetchDescriptor<GameTemplate>()
+        let templates = try context.fetch(descriptor)
+        return templates.first(where: { $0.id == id })
     }
 
     private func touch(_ event: Event) {

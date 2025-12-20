@@ -150,9 +150,16 @@ enum GameCatalogCSVImporter {
             let defaultPlayersPerTeam = parsePositiveInt(cols, iPlayersPerTeam, defaultValue: 2)
             let defaultRoundsPerGame = parsePositiveInt(cols, iRounds, defaultValue: 1)
 
-            let existing = try fetchTemplateByExternalId(context: context, externalId: externalId)
+            // Check for existing template by BOTH externalId AND name
+            let existing = try fetchTemplateByExternalIdOrName(
+                context: context,
+                externalId: externalId,
+                name: name
+            )
 
             if let t = existing {
+                // Update existing template
+                t.externalId = externalId  // Update externalId in case name matched
                 t.name = name
                 t.groupName = groupName
                 t.defaultTeamCount = defaultTeamCount
@@ -162,6 +169,7 @@ enum GameCatalogCSVImporter {
                 t.instructions = instructions
                 result.insertedOrUpdated += 1
             } else {
+                // Create new template
                 let t = GameTemplate(
                     externalId: externalId,
                     name: name,
@@ -273,10 +281,26 @@ enum GameCatalogCSVImporter {
         return result
     }
 
-    private static func fetchTemplateByExternalId(context: ModelContext, externalId: String) throws -> GameTemplate? {
-        let descriptor = FetchDescriptor<GameTemplate>(
-            predicate: #Predicate { $0.externalId == externalId }
-        )
-        return try context.fetch(descriptor).first
+    /// Fetch existing template by externalId OR name (case-insensitive)
+    /// This prevents duplicates even if gameId changes or manual entries exist
+    private static func fetchTemplateByExternalIdOrName(
+        context: ModelContext,
+        externalId: String,
+        name: String
+    ) throws -> GameTemplate? {
+        let descriptor = FetchDescriptor<GameTemplate>()
+        let templates = try context.fetch(descriptor)
+        
+        // First try exact externalId match (most reliable)
+        if let match = templates.first(where: { $0.externalId == externalId }) {
+            return match
+        }
+        
+        // Fallback: check if name matches (case-insensitive)
+        // This catches manually-created games with the same name
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return templates.first(where: {
+            $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedName
+        })
     }
 }

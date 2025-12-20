@@ -28,7 +28,8 @@ struct GameCatalogView: View {
     
     enum SortOption: String, CaseIterable {
         case alphabetical = "A-Z"
-        case group = "Group"
+        case reverseAlphabetical = "Z-A"
+        case status = "Status"
     }
     
     enum TeamTypeFilter: String, CaseIterable {
@@ -185,7 +186,10 @@ struct GameCatalogView: View {
         switch sortOption {
         case .alphabetical:
             result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        case .group:
+        case .reverseAlphabetical:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        case .status:
+            // For GameCatalog, we can sort by group name as a proxy for "status"
             result.sort { lhs, rhs in
                 let lGroup = lhs.groupName ?? ""
                 let rGroup = rhs.groupName ?? ""

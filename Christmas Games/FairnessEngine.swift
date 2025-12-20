@@ -345,8 +345,9 @@ final class FairnessEngine {
     }
 
     private func fetchTemplate(id: UUID) throws -> GameTemplate? {
-        let d = FetchDescriptor<GameTemplate>(predicate: #Predicate { $0.id == id })
-        return try context.fetch(d).first
+        let d = FetchDescriptor<GameTemplate>()
+        let templates = try context.fetch(d)
+        return templates.first(where: { $0.id == id })
     }
 }
 

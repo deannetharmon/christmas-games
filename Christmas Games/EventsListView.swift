@@ -69,6 +69,7 @@ private struct EventDetailView: View {
     enum SortOption: String, CaseIterable {
         case orderIndex = "Order"
         case alphabetical = "A-Z"
+        case reverseAlphabetical = "Z-A"
         case status = "Status"
     }
     
@@ -153,21 +154,19 @@ private struct EventDetailView: View {
         .navigationTitle(event.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-    ToolbarItem(placement: .topBarLeading) {
-        lifecycleButton()
-    }
-    ToolbarItemGroup(placement: .topBarTrailing) {
-        // Only show Reset when event is not active
-        if event.status != .active {
-            Button("Reset") {
-                message = "This will reset all games and statistics. Continue?"
-                showResetConfirm = true
+            ToolbarItem(placement: .topBarLeading) {
+                lifecycleButton()
+            }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                if event.status != .active {
+                    Button("Reset") {
+                        showResetConfirm = true
+                    }
+                }
+                Button("Players") { showPlayers = true }
+                Button("Add Games") { showAddGame = true }
             }
         }
-        Button("Players") { showPlayers = true }
-        Button("Add Games") { showAddGame = true }
-    }
-}
         .sheet(isPresented: $showAddGame) {
             AddGameToEventSheet(event: event)
         }
@@ -178,6 +177,18 @@ private struct EventDetailView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(message ?? "Unknown error")
+        }
+        .confirmationDialog("Reset Event", isPresented: $showResetConfirm, titleVisibility: .visible) {
+            Button("Reset Event", role: .destructive) {
+                do {
+                    try EventEngine(context: context).resetEvent(event)
+                } catch {
+                    show(error)
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will reset all games to 'not started', delete all rounds and statistics. Participants will be kept.")
         }
     }
     
@@ -240,8 +251,8 @@ private struct EventDetailView: View {
         if let filterTeamSize {
             games = games.filter { eg in
                 let template = templates.first(where: { $0.id == eg.gameTemplateId })
-                let playersPerTeam = eg.overridePlayersPerTeam ?? template?.defaultPlayersPerTeam ?? 0
-                return playersPerTeam == filterTeamSize
+                let size = eg.overridePlayersPerTeam ?? template?.defaultPlayersPerTeam ?? 0
+                return size == filterTeamSize
             }
         }
         
@@ -249,8 +260,8 @@ private struct EventDetailView: View {
         if let filterTeamCount {
             games = games.filter { eg in
                 let template = templates.first(where: { $0.id == eg.gameTemplateId })
-                let teamCount = eg.overrideTeamCount ?? template?.defaultTeamCount ?? 0
-                return teamCount == filterTeamCount
+                let count = eg.overrideTeamCount ?? template?.defaultTeamCount ?? 0
+                return count == filterTeamCount
             }
         }
         
@@ -264,9 +275,15 @@ private struct EventDetailView: View {
                 let name2 = templates.first(where: { $0.id == game2.gameTemplateId })?.name ?? ""
                 return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
             }
+        case .reverseAlphabetical:
+            games.sort { game1, game2 in
+                let name1 = templates.first(where: { $0.id == game1.gameTemplateId })?.name ?? ""
+                let name2 = templates.first(where: { $0.id == game2.gameTemplateId })?.name ?? ""
+                return name1.localizedCaseInsensitiveCompare(name2) == .orderedDescending
+            }
         case .status:
             games.sort { game1, game2 in
-                if game1.statusRaw != game2.statusRaw {
+                if game1.status != game2.status {
                     return game1.statusRaw < game2.statusRaw
                 }
                 return game1.orderIndex < game2.orderIndex
@@ -344,6 +361,7 @@ private struct EventDetailView: View {
         showMessage = true
     }
 }
+
 // MARK: - Event Players Sheet
 
 private struct SelectEventPlayersSheet: View {
