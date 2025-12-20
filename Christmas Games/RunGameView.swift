@@ -3,6 +3,7 @@ import SwiftData
 
 struct RunGameView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorTheme) private var theme
     let event: Event
 
     @Query(sort: \Person.displayName)
@@ -219,14 +220,7 @@ struct RunGameView: View {
     }
     
     private func teamColor(_ index: Int) -> Color {
-        let colors: [Color] = [
-            .red,
-            .blue,
-            .green,
-            .orange,
-            .purple,
-            Color(red: 0.0, green: 0.7, blue: 0.7) // Teal
-        ]
+        let colors = theme.teamColors
         return colors[index % colors.count]
     }
 

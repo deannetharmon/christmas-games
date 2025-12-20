@@ -12,16 +12,20 @@ struct MainMenuView: View {
 
     @Query(sort: \GameTemplate.name)
     private var games: [GameTemplate]
+    
+    @AppStorage("selectedTheme") private var selectedThemeRaw: String = ColorTheme.christmas.rawValue
+    @State private var showThemePicker = false
+    
+    private var selectedTheme: ColorTheme {
+        ColorTheme(rawValue: selectedThemeRaw) ?? .christmas
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Christmas gradient background
+                // Themed gradient background
                 LinearGradient(
-                    colors: [
-                        Color(red: 0.7, green: 0.15, blue: 0.15),  // Deep red
-                        Color(red: 0.15, green: 0.5, blue: 0.2)    // Forest green
-                    ],
+                    colors: [selectedTheme.gradientStart, selectedTheme.gradientEnd],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -76,7 +80,22 @@ struct MainMenuView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showThemePicker = true
+                    } label: {
+                        Image(systemName: "paintpalette.fill")
+                            .foregroundColor(.white)
+                            .font(.title3)
+                    }
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showThemePicker) {
+                ThemePickerSheet(selectedTheme: $selectedThemeRaw)
+            }
+            .environment(\.colorTheme, selectedTheme)
         }
     }
 
@@ -129,5 +148,72 @@ private struct MenuRow: View {
                 .shadow(color: .black.opacity(0.15), radius: 5, x: 0, y: 2)
         )
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Theme Picker Sheet
+
+struct ThemePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedTheme: String
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(ColorTheme.allCases) { theme in
+                    Button {
+                        selectedTheme = theme.rawValue
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 16) {
+                            // Theme preview
+                            ZStack {
+                                LinearGradient(
+                                    colors: [theme.gradientStart, theme.gradientEnd],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                                .frame(width: 60, height: 60)
+                                .cornerRadius(12)
+                                
+                                Text(theme.icon)
+                                    .font(.title)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(theme.rawValue)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                // Team colors preview
+                                HStack(spacing: 4) {
+                                    ForEach(0..<min(6, theme.teamColors.count), id: \.self) { index in
+                                        Circle()
+                                            .fill(theme.teamColors[index])
+                                            .frame(width: 16, height: 16)
+                                    }
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            if selectedTheme == theme.rawValue {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.title2)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+            .navigationTitle("Choose Theme")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
