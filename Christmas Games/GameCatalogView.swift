@@ -223,6 +223,14 @@ struct GameCatalogView: View {
                 Text("Teams: \(template.defaultTeamCount) × \(template.defaultPlayersPerTeam)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                
+                Text("•")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                
+                Text("Rounds: \(template.defaultRoundsPerGame)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -252,7 +260,8 @@ private struct EditGameTemplateSheet: View {
     @State private var defaultPlayersPerTeam = 2
     @State private var defaultRoundsPerGame = 1
     @State private var teamType: TeamType = .any
-    @State private var instructions = ""
+    @State private var playInstructions = ""
+    @State private var setupInstructions = ""
 
     var body: some View {
         NavigationStack {
@@ -276,7 +285,9 @@ private struct EditGameTemplateSheet: View {
                 }
 
                 Section("Instructions") {
-                    TextField("Instructions (optional)", text: $instructions, axis: .vertical)
+                    TextField("Setup Instructions (optional)", text: $setupInstructions, axis: .vertical)
+                        .lineLimit(3...8)
+                    TextField("Playing Instructions (optional)", text: $playInstructions, axis: .vertical)
                         .lineLimit(3...8)
                 }
             }
@@ -298,7 +309,8 @@ private struct EditGameTemplateSheet: View {
                 defaultPlayersPerTeam = template.defaultPlayersPerTeam
                 defaultRoundsPerGame = template.defaultRoundsPerGame
                 teamType = template.defaultTeamType
-                instructions = template.instructions ?? ""
+                playInstructions = template.playInstructions ?? ""
+                setupInstructions = template.setupInstructions ?? ""
             }
         }
     }
@@ -313,7 +325,8 @@ private struct EditGameTemplateSheet: View {
         template.defaultPlayersPerTeam = defaultPlayersPerTeam
         template.defaultRoundsPerGame = defaultRoundsPerGame
         template.defaultTeamType = teamType
-        template.instructions = instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : instructions
+        template.playInstructions = playInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : playInstructions
+        template.setupInstructions = setupInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : setupInstructions
 
         try? context.save()
         dismiss()

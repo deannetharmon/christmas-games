@@ -3,6 +3,7 @@ import SwiftData
 
 struct ParticipantCatalogView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorTheme) private var theme
 
     @Query(sort: \Person.displayName)
     private var people: [Person]
@@ -15,6 +16,16 @@ struct ParticipantCatalogView: View {
     @State private var showAlert = false
 
     var body: some View {
+    ZStack {
+        // Gradient background
+        LinearGradient(
+            colors: [theme.gradientStart, theme.gradientEnd],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+
+        // Your existing List
         List {
             ForEach(people) { person in
                 Button {
@@ -45,24 +56,28 @@ struct ParticipantCatalogView: View {
             }
             .onDelete(perform: deletePeople)
         }
-        .navigationTitle("Participant Catalog")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Add") { showCreatePerson = true }
-            }
-        }
-        .sheet(isPresented: $showCreatePerson) {
-            CreatePersonSheet()
-        }
-        .sheet(item: $editingPerson) { person in
-            EditPersonSheet(person: person)
-        }
-        .alert(alertTitle, isPresented: $showAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage ?? "Unknown error")
+        .scrollContentBackground(.hidden) // <- critical
+    }
+    .navigationTitle("Participant Catalog")
+    .toolbarBackground(.hidden, for: .navigationBar)   // lets gradient show under title
+    .toolbarColorScheme(.dark, for: .navigationBar)    // keeps title readable on gradient
+    .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Add") { showCreatePerson = true }
         }
     }
+    .sheet(isPresented: $showCreatePerson) {
+        CreatePersonSheet()
+    }
+    .sheet(item: $editingPerson) { person in
+        EditPersonSheet(person: person)
+    }
+    .alert(alertTitle, isPresented: $showAlert) {
+        Button("OK", role: .cancel) { }
+    } message: {
+        Text(alertMessage ?? "Unknown error")
+    }
+}
 
     private func deletePeople(at offsets: IndexSet) {
         for index in offsets {
@@ -78,3 +93,4 @@ struct ParticipantCatalogView: View {
     }
     .modelContainer(for: [Person.self])
 }
+

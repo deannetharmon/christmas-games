@@ -98,7 +98,8 @@ enum GameCatalogCSVImporter {
         let iTeamCount = colIndex("defaultTeamCount", alternatives: ["defaultteamcount"])
         let iPlayersPerTeam = colIndex("defaultPlayersPerTeam", alternatives: ["defaultplayersperteam"])
         let iRounds = colIndex("defaultRoundsPerGame", alternatives: ["defaultroundspergame"])
-        let iInstructionText = colIndex("instructionText", alternatives: ["instructiontext", "instructions"])
+        let iPlayInstructionText = colIndex("playInstructions", alternatives: ["playinstructions", "playinstructiontext"])
+        let iSetupInstructionText = colIndex("setupInstructions", alternatives: ["setupinstructions", "setupinstructiontext"])
         let iCheck = colIndex("check", alternatives: ["Check"])
 
         var result = ImportResult(insertedOrUpdated: 0, skipped: 0, removed: 0)
@@ -138,9 +139,15 @@ enum GameCatalogCSVImporter {
                 return g.isEmpty ? nil : g
             }()
 
-            let instructions: String? = {
-                guard let iInstructionText, iInstructionText < cols.count else { return nil }
-                let t = cols[iInstructionText].trimmingCharacters(in: .whitespacesAndNewlines)
+            let playInstructions: String? = {
+                guard let iPlayInstructionText, iPlayInstructionText < cols.count else { return nil }
+                let t = cols[iPlayInstructionText].trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            }()
+
+            let setupInstructions: String? = {
+                guard let iSetupInstructionText, iSetupInstructionText < cols.count else { return nil }
+                let t = cols[iSetupInstructionText].trimmingCharacters(in: .whitespacesAndNewlines)
                 return t.isEmpty ? nil : t
             }()
 
@@ -150,26 +157,19 @@ enum GameCatalogCSVImporter {
             let defaultPlayersPerTeam = parsePositiveInt(cols, iPlayersPerTeam, defaultValue: 2)
             let defaultRoundsPerGame = parsePositiveInt(cols, iRounds, defaultValue: 1)
 
-            // Check for existing template by BOTH externalId AND name
-            let existing = try fetchTemplateByExternalIdOrName(
-                context: context,
-                externalId: externalId,
-                name: name
-            )
+            let existing = try fetchTemplateByExternalId(context: context, externalId: externalId)
 
             if let t = existing {
-                // Update existing template
-                t.externalId = externalId  // Update externalId in case name matched
                 t.name = name
                 t.groupName = groupName
                 t.defaultTeamCount = defaultTeamCount
                 t.defaultPlayersPerTeam = defaultPlayersPerTeam
                 t.defaultRoundsPerGame = defaultRoundsPerGame
                 t.defaultTeamTypeRaw = teamType.rawValue
-                t.instructions = instructions
+                t.playInstructions = playInstructions
+                t.setupInstructions = setupInstructions
                 result.insertedOrUpdated += 1
             } else {
-                // Create new template
                 let t = GameTemplate(
                     externalId: externalId,
                     name: name,
@@ -178,7 +178,8 @@ enum GameCatalogCSVImporter {
                     defaultPlayersPerTeam: defaultPlayersPerTeam,
                     defaultRoundsPerGame: defaultRoundsPerGame,
                     defaultTeamType: teamType,
-                    instructions: instructions
+                    playInstructions: playInstructions,
+                    setupInstructions: setupInstructions
                 )
                 context.insert(t)
                 result.insertedOrUpdated += 1
@@ -281,26 +282,10 @@ enum GameCatalogCSVImporter {
         return result
     }
 
-    /// Fetch existing template by externalId OR name (case-insensitive)
-    /// This prevents duplicates even if gameId changes or manual entries exist
-    private static func fetchTemplateByExternalIdOrName(
-        context: ModelContext,
-        externalId: String,
-        name: String
-    ) throws -> GameTemplate? {
+    private static func fetchTemplateByExternalId(context: ModelContext, externalId: String) throws -> GameTemplate? {
         let descriptor = FetchDescriptor<GameTemplate>()
         let templates = try context.fetch(descriptor)
-        
-        // First try exact externalId match (most reliable)
-        if let match = templates.first(where: { $0.externalId == externalId }) {
-            return match
+        return templates.first(where: { $0.externalId == externalId })
         }
-        
-        // Fallback: check if name matches (case-insensitive)
-        // This catches manually-created games with the same name
-        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return templates.first(where: {
-            $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedName
-        })
     }
-}
+

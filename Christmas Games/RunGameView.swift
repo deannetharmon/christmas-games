@@ -4,6 +4,7 @@ import SwiftData
 struct RunGameView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorTheme) private var theme
+
     let event: Event
 
     @Query(sort: \Person.displayName)
@@ -18,67 +19,40 @@ struct RunGameView: View {
     @State private var showPickNextGame = false
     @State private var showResetConfirm = false
 
+
     @State private var showSwap = false
     @State private var swapOutgoing: UUID?
 
-    @State private var showAfterRoundSheet = false
-    @State private var showSkipConfirmation = false
+    @State private var showAfterRoundDialog = false
+    @State private var showAfterGameDialog = false
 
     @State private var showWinnerPicker = false
-    @State private var showEventStats = false
+    @State private var showSkipConfirmation = false
 
     var body: some View {
-        mainView
-            .sheet(isPresented: $showAfterRoundSheet) {
-                if let game = currentGame {
-                    AfterRoundSheet(
-                        currentGame: game,
-                        onNewRoundSamePlayers: {
-                            createRoundWithSamePlayers(eventGame: game)
-                        },
-                        onNewRoundNewPlayers: {
-                            createRoundWithNewPlayers(eventGame: game)
-                        },
-                        onNextGameRandom: {
-                            handlePickNextGameRandom(currentGame: game)
-                        },
-                        onNextGameChoose: {
-                            showPickNextGame = true
-                        }
-                    )
-                }
-            }
-            .onChange(of: event.status) { oldValue, newValue in
-                // Auto-show sheet when resuming if needed
-                if oldValue == .paused && newValue == .active && shouldShowAfterRoundSheet {
-                    showAfterRoundSheet = true
-                }
-            }
-    }
-    
-    private var mainView: some View {
         ZStack {
+            LinearGradient(
+                colors: [theme.gradientStart, theme.gradientEnd],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
             VStack(spacing: 12) {
                 content
                 Spacer()
             }
             .padding()
-            
-            // Paused overlay
+
             if event.status == .paused {
                 pausedOverlay
             }
         }
         .navigationTitle("Run Game")
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                // Stats button
-                Button {
-                    showEventStats = true
-                } label: {
-                    Image(systemName: "chart.bar")
-                }
-                
                 // Pause/Resume button
                 if event.status == .active {
                     Button("Pause") {
@@ -107,23 +81,6 @@ struct RunGameView: View {
                 handlePick(selection: selection, skipMode: skipMode)
             }
         }
-        .sheet(isPresented: $showEventStats) {
-            EventStatsSheet(event: event, people: people)
-        }
-        .sheet(isPresented: $showSwap) {
-            SwapPlayerSheet(
-                event: event,
-                currentRound: currentRound!,
-                people: people,
-                outgoing: swapOutgoing
-            ) { incoming in
-                do {
-                    if let out = swapOutgoing, let round = currentRound {
-                        try engine.swapPlayer(in: round, from: out, to: incoming)
-                    }
-                } catch { show(error) }
-            }
-        }
         .alert("Message", isPresented: $showMessage) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -140,14 +97,6 @@ struct RunGameView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will reset all games to 'not started', delete all rounds and statistics. Participants will be kept.")
-        }
-        .confirmationDialog("Skip this game?", isPresented: $showSkipConfirmation, titleVisibility: .visible) {
-            Button("Skip Game", role: .destructive) {
-                handleSkipGame()
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This will mark the current game as complete and start a new random game with the same players.")
         }
     }
 
@@ -198,30 +147,10 @@ struct RunGameView: View {
             .sorted(by: { $0.roundIndex > $1.roundIndex })
             .first(where: { $0.completedAt == nil })
     }
-    
-    private var shouldShowAfterRoundSheet: Bool {
-        guard let game = currentGame else { return false }
-        
-        // If there's an active unlocked round, don't show sheet
-        if currentRound != nil { return false }
-        
-        // If last round is completed but no new round created, show sheet
-        if let lastRound = game.rounds.sorted(by: { $0.roundIndex > $1.roundIndex }).first,
-           lastRound.completedAt != nil {
-            return true
-        }
-        
-        return false
-    }
 
     private func teamLabel(_ index: Int) -> String {
         let scalar = UnicodeScalar(65 + index)!
         return String(Character(scalar))
-    }
-    
-    private func teamColor(_ index: Int) -> Color {
-        let colors = theme.teamColors
-        return colors[index % colors.count]
     }
 
     private func teamNames(_ team: RoundTeam) -> String {
@@ -236,8 +165,6 @@ struct RunGameView: View {
             header(template: template, eventGame: eg)
             if let round = currentRound {
                 roundCard(template: template, eventGame: eg, round: round)
-            } else if let lastRound = eg.rounds.sorted(by: { $0.roundIndex > $1.roundIndex }).first {
-                roundCard(template: template, eventGame: eg, round: lastRound)
             } else {
                 Text("No active round.").foregroundStyle(.secondary)
             }
@@ -264,9 +191,9 @@ struct RunGameView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(template.name).font(.title2).bold()
 
-            if let instructions = (eventGame.overrideInstructions ?? template.instructions),
-               !instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(instructions)
+            if let playInstructions = (eventGame.overridePlayInstructions ?? template.playInstructions),
+               !playInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(playInstructions)
                     .foregroundStyle(.secondary)
             }
 
@@ -301,13 +228,42 @@ struct RunGameView: View {
                 if !round.isLocked {
                     actionRowUnlocked(round: round)
                 } else {
-                    Button("Continue") { showAfterRoundSheet = true }
+                    Button("Continue") { showAfterRoundDialog = true }
                         .buttonStyle(.borderedProminent)
                         .disabled(event.status == .paused)
                 }
 
                 previousRoundsCompact(eventGame: eventGame)
             }
+        }
+        .sheet(isPresented: $showSwap) {
+            SwapPlayerSheet(
+                event: event,
+                currentRound: round,
+                people: people,
+                outgoing: swapOutgoing
+            ) { incoming in
+                do {
+                    if let out = swapOutgoing {
+                        try engine.swapPlayer(in: round, from: out, to: incoming)
+                    }
+                } catch { show(error) }
+            }
+        }
+        .confirmationDialog("Play another round of this game?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
+            Button("Yes – New Round") {
+                do { _ = try engine.createNextRound(for: eventGame) }
+                catch { show(error) }
+            }
+            Button("No – Next Game") { showAfterGameDialog = true }
+            Button("Cancel", role: .cancel) { }
+        }
+        .confirmationDialog("Next game", isPresented: $showAfterGameDialog, titleVisibility: .visible) {
+            Button("Pick next game (random)") {
+                handlePickNextGameRandom(currentGame: eventGame)
+            }
+            Button("Choose from list") { showPickNextGame = true }
+            Button("Cancel", role: .cancel) { }
         }
     }
 
@@ -318,7 +274,7 @@ struct RunGameView: View {
                     Text("Team \(teamLabel(index))")
                         .font(.subheadline)
                         .bold()
-                        .foregroundColor(teamColor(index))
+                        .foregroundColor(teamColor(for: index))
 
                     ForEach(team.memberPersonIds, id: \.self) { pid in
                         HStack {
@@ -337,6 +293,11 @@ struct RunGameView: View {
                 .padding(.vertical, 6)
             }
         }
+    }
+    
+    private func teamColor(for index: Int) -> Color {
+        let colors: [Color] = [.red, .green, .yellow, .blue, .orange, .purple]
+        return index < colors.count ? colors[index] : .primary
     }
 
     private func actionRowUnlocked(round: Round) -> some View {
@@ -358,10 +319,10 @@ struct RunGameView: View {
         }
         .confirmationDialog("Select winner", isPresented: $showWinnerPicker, titleVisibility: .visible) {
             ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
-                Button("Team \(teamLabel(index)) — \(teamNames(t))") {
+                Button("Team \(teamLabel(index)) – \(teamNames(t))") {
                     do {
                         try engine.finalizeRound(round, winnerTeamId: t.id)
-                        showAfterRoundSheet = true
+                        showAfterRoundDialog = true
                     } catch { show(error) }
                 }
             }
@@ -369,7 +330,7 @@ struct RunGameView: View {
             Button("Tie") {
                 do {
                     try engine.finalizeRound(round, winnerTeamId: nil)
-                    showAfterRoundSheet = true
+                    showAfterRoundDialog = true
                 } catch { show(error) }
             }
 
@@ -404,7 +365,7 @@ struct RunGameView: View {
             let names = team.memberPersonIds
                 .compactMap { peopleById[$0]?.displayName }
                 .joined(separator: ", ")
-            return "Round \(round.roundIndex + 1): Winner — \(names)"
+            return "Round \(round.roundIndex + 1): Winner – \(names)"
         }
         return "Round \(round.roundIndex + 1): Completed"
     }
@@ -465,292 +426,10 @@ struct RunGameView: View {
             show(error)
         }
     }
-    
-    private func createRoundWithSamePlayers(eventGame: EventGame) {
-        do {
-            // Get the last completed round
-            guard let lastRound = eventGame.rounds
-                .sorted(by: { $0.roundIndex > $1.roundIndex })
-                .first(where: { $0.completedAt != nil }) else {
-                return
-            }
-            
-            // Create new round
-            let newRound = try engine.createNextRound(for: eventGame)
-            
-            // Copy teams from last round
-            newRound.teams = lastRound.teams
-            
-            try context.save()
-        } catch {
-            show(error)
-        }
-    }
-    
-    private func createRoundWithNewPlayers(eventGame: EventGame) {
-        do {
-            // Create new round with empty teams
-            _ = try engine.createNextRound(for: eventGame)
-            try context.save()
-        } catch {
-            show(error)
-        }
-    }
 
     private func show(_ error: Error) {
         message = error.localizedDescription
         showMessage = true
-    }
-}
-
-// MARK: - Event Stats Sheet
-
-struct EventStatsSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let event: Event
-    let people: [Person]
-    
-    var body: some View {
-        NavigationStack {
-            if let stats = calculatedStats {
-                List {
-                    Section {
-                        HStack {
-                            Text("Name").frame(maxWidth: .infinity, alignment: .leading)
-                            Text("Games").frame(width: 50)
-                            Text("1st").frame(width: 40)
-                            Text("2nd").frame(width: 40)
-                            Text("3rd").frame(width: 40)
-                            Text("Rank").frame(width: 50)
-                        }
-                        .font(.caption)
-                        .bold()
-                    }
-                    
-                    ForEach(stats) { stat in
-                        HStack {
-                            Text(stat.displayName)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text("\(stat.gamesPlayed)")
-                                .frame(width: 50)
-                            Text("\(stat.firstPlace)")
-                                .frame(width: 40)
-                            Text("\(stat.secondPlace)")
-                                .frame(width: 40)
-                            Text("\(stat.thirdPlace)")
-                                .frame(width: 40)
-                            Text("\(stat.rank)")
-                                .frame(width: 50)
-                                .bold()
-                        }
-                        .font(.body)
-                    }
-                }
-            } else {
-                ContentUnavailableView(
-                    "No Stats Available",
-                    systemImage: "chart.bar",
-                    description: Text("Play some games to see statistics")
-                )
-            }
-        }
-        .navigationTitle("\(event.name) Stats")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") { dismiss() }
-            }
-        }
-    }
-    
-    private var calculatedStats: [PlayerStats]? {
-        var statsDict: [UUID: PlayerStats] = [:]
-        
-        for eventGame in event.eventGames {
-            for round in eventGame.rounds where round.completedAt != nil {
-                // Process placements
-                for (personId, placement) in round.placements {
-                    var stat = statsDict[personId] ?? PlayerStats(personId: personId)
-                    stat.gamesPlayed += 1
-                    
-                    switch placement {
-                    case 1: stat.firstPlace += 1
-                    case 2: stat.secondPlace += 1
-                    case 3: stat.thirdPlace += 1
-                    default: break
-                    }
-                    
-                    statsDict[personId] = stat
-                }
-                
-                // Handle ties
-                if round.resultType == .tie, round.winningTeamId == nil {
-                    for team in round.teams {
-                        for personId in team.memberPersonIds {
-                            var stat = statsDict[personId] ?? PlayerStats(personId: personId)
-                            if round.placements[personId] == nil {
-                                stat.gamesPlayed += 1
-                            }
-                            stat.firstPlace += 1
-                            statsDict[personId] = stat
-                        }
-                    }
-                }
-            }
-        }
-        
-        guard !statsDict.isEmpty else { return nil }
-        
-        let peopleById = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0) })
-        
-        var result = statsDict.values.map { stat -> PlayerStats in
-            var s = stat
-            s.displayName = peopleById[stat.personId]?.displayName ?? "Unknown"
-            s.totalPoints = (s.firstPlace * 3) + (s.secondPlace * 2) + (s.thirdPlace * 1)
-            return s
-        }
-        
-        result.sort { lhs, rhs in
-            if lhs.totalPoints != rhs.totalPoints {
-                return lhs.totalPoints > rhs.totalPoints
-            }
-            return lhs.gamesPlayed < rhs.gamesPlayed
-        }
-        
-        for (index, _) in result.enumerated() {
-            result[index].rank = index + 1
-        }
-        
-        return result
-    }
-    
-    private struct PlayerStats: Identifiable {
-        let id = UUID()
-        let personId: UUID
-        var displayName: String = ""
-        var gamesPlayed: Int = 0
-        var firstPlace: Int = 0
-        var secondPlace: Int = 0
-        var thirdPlace: Int = 0
-        var totalPoints: Int = 0
-        var rank: Int = 0
-    }
-}
-
-// MARK: - After Round Sheet
-
-struct AfterRoundSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    let currentGame: EventGame
-    let onNewRoundSamePlayers: () -> Void
-    let onNewRoundNewPlayers: () -> Void
-    let onNextGameRandom: () -> Void
-    let onNextGameChoose: () -> Void
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Round Complete!")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .padding(.top, 20)
-                
-                Divider()
-                
-                // Option 1: Play another round
-                VStack(spacing: 12) {
-                    Text("Play Another Round")
-                        .font(.headline)
-                    
-                    HStack(spacing: 12) {
-                        Button {
-                            onNewRoundSamePlayers()
-                            dismiss()
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.title2)
-                                Text("Same Players")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button {
-                            onNewRoundNewPlayers()
-                            dismiss()
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "shuffle")
-                                    .font(.title2)
-                                Text("New Players")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                Divider()
-                
-                // Option 2: Next game
-                VStack(spacing: 12) {
-                    Text("Move to Next Game")
-                        .font(.headline)
-                    
-                    HStack(spacing: 12) {
-                        Button {
-                            onNextGameRandom()
-                            dismiss()
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "dice")
-                                    .font(.title2)
-                                Text("Random Game")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button {
-                            onNextGameChoose()
-                            dismiss()
-                        } label: {
-                            VStack(spacing: 8) {
-                                Image(systemName: "list.bullet")
-                                    .font(.title2)
-                                Text("Choose Game")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding()
-            .presentationDetents([.medium])
-            .interactiveDismissDisabled()
-        }
     }
 }
 

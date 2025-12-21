@@ -3,6 +3,7 @@ import SwiftData
 
 struct EventStatsView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorTheme) private var theme
 
     @Query(sort: \Event.createdAt, order: .reverse)
     private var allEvents: [Event]
@@ -11,32 +12,43 @@ struct EventStatsView: View {
     private var people: [Person]
 
     @State private var selectedEventId: UUID?
-    
+
     @State private var showResetConfirm = false
     @State private var message: String?
     @State private var showMessage = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            eventPicker
+        ZStack {
+            LinearGradient(
+                colors: [theme.gradientStart, theme.gradientEnd],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-            if let stats = calculatedStats {
-                statsTable(stats: stats)
-            } else {
-                ContentUnavailableView(
-                    "No Stats Available",
-                    systemImage: "chart.bar",
-                    description: Text("Play some games to see statistics")
-                )
+            VStack(spacing: 0) {
+                eventPicker
+
+                if let stats = calculatedStats {
+                    statsTable(stats: stats)
+                        .scrollContentBackground(.hidden)
+                } else {
+                    ContentUnavailableView(
+                        "No Stats Available",
+                        systemImage: "chart.bar",
+                        description: Text("Play some games to see statistics.")
+                    )
+                    .padding()
+                }
             }
         }
         .navigationTitle("Event Stats")
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Reset") {
-                    showResetConfirm = true
-                }
-                .disabled(selectedEventId == nil)
+                Button("Reset") { showResetConfirm = true }
+                    .disabled(selectedEventId == nil)
             }
         }
         .confirmationDialog("Reset Event", isPresented: $showResetConfirm, titleVisibility: .visible) {
@@ -156,14 +168,10 @@ struct EventStatsView: View {
                 HStack {
                     Text(stat.displayName)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("\(stat.gamesPlayed)")
-                        .frame(width: 50)
-                    Text("\(stat.firstPlace)")
-                        .frame(width: 40)
-                    Text("\(stat.secondPlace)")
-                        .frame(width: 40)
-                    Text("\(stat.thirdPlace)")
-                        .frame(width: 40)
+                    Text("\(stat.gamesPlayed)").frame(width: 50)
+                    Text("\(stat.firstPlace)").frame(width: 40)
+                    Text("\(stat.secondPlace)").frame(width: 40)
+                    Text("\(stat.thirdPlace)").frame(width: 40)
                     Text("\(stat.rank)")
                         .frame(width: 50)
                         .bold()
@@ -172,13 +180,13 @@ struct EventStatsView: View {
             }
         }
     }
-    
+
     private func resetSelectedEvent() {
         guard let selectedEventId,
               let event = allEvents.first(where: { $0.id == selectedEventId }) else {
             return
         }
-        
+
         do {
             try EventEngine(context: context).resetEvent(event)
             message = "Event '\(event.name)' has been reset successfully."

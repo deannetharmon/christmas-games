@@ -23,25 +23,43 @@ struct CreatePersonSheet: View {
                 }
 
                 Section("Details") {
-                    Picker("Gender", selection: $sex) {
-                        Text("M").tag("M")
-                        Text("F").tag("F")
+                    HStack {
+                        Text("Gender:")
+                        Spacer()
+                        Picker("Gender", selection: $sex) {
+                            Text("M").tag("M")
+                            Text("F").tag("F")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
 
-                    Picker("Weight", selection: $weightCategory) {
-                        Text("S").tag("S")
-                        Text("M").tag("M")
-                        Text("L").tag("L")
+                    HStack {
+                        Text("Weight:")
+                        Spacer()
+                        Picker("Weight", selection: $weightCategory) {
+                            Text("S").tag("S")
+                            Text("M").tag("M")
+                            Text("L").tag("L")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
 
-                    Picker("Height", selection: $heightCategory) {
-                        Text("S").tag("S")
-                        Text("M").tag("M")
-                        Text("L").tag("L")
+                    HStack {
+                        Text("Height:")
+                        Spacer()
+                        Picker("Height", selection: $heightCategory) {
+                            Text("S").tag("S")
+                            Text("M").tag("M")
+                            Text("L").tag("L")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
                 }
 
                 Section("Spouse (Optional)") {
@@ -143,25 +161,43 @@ struct EditPersonSheet: View {
                 }
 
                 Section("Details") {
-                    Picker("Gender", selection: $sex) {
-                        Text("M").tag("M")
-                        Text("F").tag("F")
+                    HStack {
+                        Text("Gender:")
+                        Spacer()
+                        Picker("Gender", selection: $sex) {
+                            Text("M").tag("M")
+                            Text("F").tag("F")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
 
-                    Picker("Weight", selection: $weightCategory) {
-                        Text("S").tag("S")
-                        Text("M").tag("M")
-                        Text("L").tag("L")
+                    HStack {
+                        Text("Weight:")
+                        Spacer()
+                        Picker("Weight", selection: $weightCategory) {
+                            Text("S").tag("S")
+                            Text("M").tag("M")
+                            Text("L").tag("L")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
 
-                    Picker("Height", selection: $heightCategory) {
-                        Text("S").tag("S")
-                        Text("M").tag("M")
-                        Text("L").tag("L")
+                    HStack {
+                        Text("Height:")
+                        Spacer()
+                        Picker("Height", selection: $heightCategory) {
+                            Text("S").tag("S")
+                            Text("M").tag("M")
+                            Text("L").tag("L")
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 120)
                     }
-                    .pickerStyle(.segmented)
                 }
 
                 Section("Spouse (Optional)") {

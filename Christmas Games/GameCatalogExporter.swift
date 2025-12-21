@@ -22,7 +22,8 @@ enum GameCatalogExporter {
                     defaultPlayersPerTeam: t.defaultPlayersPerTeam,
                     defaultRoundsPerGame: t.defaultRoundsPerGame,
                     teamType: t.defaultTeamType,
-                    instructions: t.instructions
+                    playInstructions: t.playInstructions,
+                    setupInstructions: t.setupInstructions
                 )
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -62,5 +63,6 @@ private struct ExportGameCatalogGame: Codable {
     let defaultPlayersPerTeam: Int
     let defaultRoundsPerGame: Int
     let teamType: TeamType
-    let instructions: String?
+    let playInstructions: String?
+    let setupInstructions: String?
 }

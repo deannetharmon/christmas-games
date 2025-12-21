@@ -91,7 +91,8 @@ final class GameTemplate {
     var defaultRoundsPerGame: Int
     var defaultTeamTypeRaw: String
 
-    var instructions: String?
+    var playInstructions: String?
+    var setupInstructions: String?
 
     init(
         id: UUID = UUID(),
@@ -102,7 +103,8 @@ final class GameTemplate {
         defaultPlayersPerTeam: Int,
         defaultRoundsPerGame: Int,
         defaultTeamType: TeamType,
-        instructions: String? = nil
+        playInstructions: String? = nil,
+        setupInstructions: String? = nil
     ) {
         self.id = id
         self.externalId = externalId
@@ -112,7 +114,8 @@ final class GameTemplate {
         self.defaultPlayersPerTeam = defaultPlayersPerTeam
         self.defaultRoundsPerGame = defaultRoundsPerGame
         self.defaultTeamTypeRaw = defaultTeamType.rawValue
-        self.instructions = instructions
+        self.playInstructions = playInstructions
+        self.setupInstructions = setupInstructions
     }
 
     @Transient
@@ -195,7 +198,8 @@ final class EventGame {
     var overridePlayersPerTeam: Int?
     var overrideRoundsPerGame: Int?
     var overrideTeamTypeRaw: String?
-    var overrideInstructions: String?
+    var overridePlayInstructions: String?
+    var overrideSetupInstructions: String?
 
     var overrideTeamPlayersData: Data?
 
@@ -213,7 +217,8 @@ final class EventGame {
         overrideRoundsPerGame: Int? = nil,
         overrideTeamType: TeamType? = nil,
         overrideTeamPlayers: [[UUID]]? = nil,
-        overrideInstructions: String? = nil,
+        overridePlayInstructions: String? = nil,
+        overrideSetupInstructions: String? = nil,
         rounds: [Round] = []
     ) {
         self.id = id
@@ -230,7 +235,8 @@ final class EventGame {
         } else {
             self.overrideTeamPlayersData = nil
         }
-        self.overrideInstructions = overrideInstructions
+        self.overridePlayInstructions = overridePlayInstructions
+        self.overrideSetupInstructions = overrideSetupInstructions
         self.rounds = rounds
     }
 

@@ -13,7 +13,8 @@ struct CreateGameTemplateSheet: View {
     @State private var defaultPlayersPerTeam = 2
     @State private var defaultRoundsPerGame = 1
     @State private var teamType: TeamType = .any
-    @State private var instructions = ""
+    @State private var playInstructions = ""
+    @State private var setupInstructions = ""
 
     var body: some View {
         NavigationStack {
@@ -37,7 +38,9 @@ struct CreateGameTemplateSheet: View {
                 }
 
                 Section("Instructions") {
-                    TextField("Instructions (optional)", text: $instructions, axis: .vertical)
+                    TextField("Setup Instructions (optional)", text: $setupInstructions, axis: .vertical)
+                        .lineLimit(3...8)
+                    TextField("Playing Instructions (optional)", text: $playInstructions, axis: .vertical)
                         .lineLimit(3...8)
                 }
             }
@@ -67,7 +70,8 @@ struct CreateGameTemplateSheet: View {
             defaultPlayersPerTeam: defaultPlayersPerTeam,
             defaultRoundsPerGame: defaultRoundsPerGame,
             defaultTeamType: teamType,
-            instructions: instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : instructions
+            playInstructions: playInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : playInstructions,
+            setupInstructions: setupInstructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : setupInstructions
         )
 
         context.insert(template)

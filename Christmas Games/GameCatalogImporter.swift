@@ -78,7 +78,8 @@ enum GameCatalogImporter {
             existing.defaultPlayersPerTeam = game.defaultPlayersPerTeam
             existing.defaultRoundsPerGame = game.defaultRoundsPerGame
             existing.defaultTeamTypeRaw = game.teamType.rawValue
-            existing.instructions = game.instructions
+            existing.playInstructions = game.playInstructions
+            existing.setupInstructions = game.setupInstructions
         } else {
             let template = GameTemplate(
                 externalId: game.externalId,
@@ -88,7 +89,8 @@ enum GameCatalogImporter {
                 defaultPlayersPerTeam: game.defaultPlayersPerTeam,
                 defaultRoundsPerGame: game.defaultRoundsPerGame,
                 defaultTeamType: game.teamType,
-                instructions: game.instructions
+                playInstructions: game.playInstructions,
+                setupInstructions: game.setupInstructions
             )
             context.insert(template)
         }
@@ -116,5 +118,6 @@ private struct GameCatalogGame: Codable {
     let defaultPlayersPerTeam: Int
     let defaultRoundsPerGame: Int
     let teamType: TeamType
-    let instructions: String?
+    let playInstructions: String?
+    let setupInstructions: String?
 }
