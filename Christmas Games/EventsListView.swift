@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 
 struct EventsListView: View {
     @Environment(\.modelContext) private var context
-    @Environment(\.colorTheme) private var theme
+    @EnvironmentObject var themeManager: ThemeManager
 
     @Query(sort: \Event.createdAt, order: .reverse)
     private var events: [Event]
@@ -13,17 +13,14 @@ struct EventsListView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.gradientStart, theme.gradientEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            themeManager.background
+                .ignoresSafeArea()
 
             List {
                 ForEach(events) { event in
                     NavigationLink {
                         EventDetailView(event: event)
+                            .environmentObject(themeManager)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.name).font(.headline)
@@ -39,14 +36,15 @@ struct EventsListView: View {
         }
         .navigationTitle("Events")
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Add Event") { showAddEvent = true }
+                    .foregroundColor(themeManager.text)
             }
         }
         .sheet(isPresented: $showAddEvent) {
             AddEventSheet()
+                .environmentObject(themeManager)
         }
     }
 
@@ -60,7 +58,7 @@ struct EventsListView: View {
 
 private struct EventDetailView: View {
     @Environment(\.modelContext) private var context
-    @Environment(\.colorTheme) private var theme
+    @EnvironmentObject var themeManager: ThemeManager
 
     let event: Event
 
@@ -92,16 +90,21 @@ private struct EventDetailView: View {
         case notStarted = "Not Started"
         case inProgress = "In Progress"
         case completed = "Completed"
+        
+        var gameStatus: GameStatus? {
+            switch self {
+            case .all: return nil
+            case .notStarted: return .notStarted
+            case .inProgress: return .inProgress
+            case .completed: return .completed
+            }
+        }
     }
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.gradientStart, theme.gradientEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            themeManager.background
+                .ignoresSafeArea()
 
             List {
                 // Compact stats section
@@ -120,6 +123,7 @@ private struct EventDetailView: View {
                 Section {
                     NavigationLink("Run Event") {
                         RunGameView(event: event)
+                            .environmentObject(themeManager)
                     }
                     .disabled(event.eventGames.isEmpty || event.participantIds.isEmpty)
                 } header: {
@@ -181,6 +185,7 @@ private struct EventDetailView: View {
                     ForEach(filteredAndSortedGames) { eg in
                         NavigationLink {
                             EventGameDetailView(event: event, eventGame: eg)
+                                .environmentObject(themeManager)
                         } label: {
                             gameRow(for: eg)
                         }
@@ -196,20 +201,22 @@ private struct EventDetailView: View {
         .navigationTitle(event.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 lifecycleButton
             }
             ToolbarItem(placement: .topBarTrailing) {
                 EditButton()
+                    .foregroundColor(themeManager.text)
             }
         }
         .sheet(isPresented: $showPlayers) {
             ParticipantPickerSheet(event: event)
+                .environmentObject(themeManager)
         }
         .sheet(isPresented: $showAddGame) {
             AddGamesSheet(event: event, templates: templates)
+                .environmentObject(themeManager)
         }
         .alert("Message", isPresented: $showMessage) {
             Button("OK", role: .cancel) { }
@@ -241,90 +248,83 @@ private struct EventDetailView: View {
 
     private var statusIcon: String {
         switch event.status {
-        case .available: return "pause.circle"
-        case .active: return "play.circle"
+        case .available: return "circle"
+        case .active: return "play.circle.fill"
         case .paused: return "pause.circle.fill"
         case .completed: return "checkmark.circle.fill"
         }
     }
 
     private var statusColor: Color {
-        theme.statusColor(event.status)
+        themeManager.statusColor(event.status)
     }
 
     private var allTeamSizes: [Int] {
-        let values = event.eventGames.compactMap { eg -> Int? in
-            if let t = templates.first(where: { $0.id == eg.gameTemplateId }) {
-                return eg.overridePlayersPerTeam ?? t.defaultPlayersPerTeam
-            }
-            return nil
-        }
-        return Array(Set(values)).sorted()
+        let arr = Array(Set(event.eventGames.compactMap { eg -> Int? in
+            let t = templates.first(where: { $0.id == eg.gameTemplateId })
+            return eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam
+        }))
+        return arr.sorted()
     }
 
     private var allTeamCounts: [Int] {
-        let values = event.eventGames.compactMap { eg -> Int? in
-            if let t = templates.first(where: { $0.id == eg.gameTemplateId }) {
-                return eg.overrideTeamCount ?? t.defaultTeamCount
-            }
-            return nil
-        }
-        return Array(Set(values)).sorted()
+        let arr = Array(Set(event.eventGames.compactMap { eg -> Int? in
+            let t = templates.first(where: { $0.id == eg.gameTemplateId })
+            return eg.overrideTeamCount ?? t?.defaultTeamCount
+        }))
+        return arr.sorted()
     }
 
     private var filteredAndSortedGames: [EventGame] {
-        var list = event.eventGames
+        var games = event.eventGames
 
-        // status filter
-        switch statusFilter {
-        case .all:
-            break
-        case .notStarted:
-            list = list.filter { $0.status == .notStarted }
-        case .inProgress:
-            list = list.filter { $0.status == .inProgress }
-        case .completed:
-            list = list.filter { $0.status == .completed }
-        }
-
-        // team size filter
+        // Apply team size filter
         if let size = filterTeamSize {
-            list = list.filter { eg in
+            games = games.filter { eg in
                 let t = templates.first(where: { $0.id == eg.gameTemplateId })
-                let playersPerTeam = eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam ?? 0
-                return playersPerTeam == size
+                let ppt = eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam ?? 0
+                return ppt == size
             }
         }
 
-        // team count filter
+        // Apply team count filter
         if let count = filterTeamCount {
-            list = list.filter { eg in
+            games = games.filter { eg in
                 let t = templates.first(where: { $0.id == eg.gameTemplateId })
-                let teamCount = eg.overrideTeamCount ?? t?.defaultTeamCount ?? 0
-                return teamCount == count
+                let tc = eg.overrideTeamCount ?? t?.defaultTeamCount ?? 0
+                return tc == count
             }
         }
 
-        // sorting
+        // Apply status filter
+        if let targetStatus = statusFilter.gameStatus {
+            games = games.filter { $0.status == targetStatus }
+        }
+
+        // Apply sorting
         switch sortOption {
         case .orderIndex:
-            list = list.sorted { $0.orderIndex < $1.orderIndex }
+            games.sort { $0.orderIndex < $1.orderIndex }
         case .alphabetical:
-            list = list.sorted {
-                gameName(for: $0).localizedCaseInsensitiveCompare(gameName(for: $1)) == .orderedAscending
+            games.sort { eg1, eg2 in
+                let n1 = templates.first(where: { $0.id == eg1.gameTemplateId })?.name ?? ""
+                let n2 = templates.first(where: { $0.id == eg2.gameTemplateId })?.name ?? ""
+                return n1 < n2
             }
         case .reverseAlphabetical:
-            list = list.sorted {
-                gameName(for: $0).localizedCaseInsensitiveCompare(gameName(for: $1)) == .orderedDescending
+            games.sort { eg1, eg2 in
+                let n1 = templates.first(where: { $0.id == eg1.gameTemplateId })?.name ?? ""
+                let n2 = templates.first(where: { $0.id == eg2.gameTemplateId })?.name ?? ""
+                return n1 > n2
             }
         case .status:
-            list = list.sorted { $0.statusRaw < $1.statusRaw }
+            games.sort { $0.statusRaw < $1.statusRaw }
         }
 
-        return list
+        return games
     }
 
-    // MARK: - UI pieces
+    // MARK: - Lifecycle UI
 
     private var lifecycleButton: some View {
         Menu {
@@ -338,10 +338,17 @@ private struct EventDetailView: View {
                 do { try engine.resumeEvent(event) } catch { present(error) }
             }
             Button("Complete") {
-                do { try engine.completeEvent(event) } catch { present(error) }
+                do {
+                    event.status = .completed
+                    event.currentEventGameId = nil
+                    try context.save()
+                } catch {
+                    present(error)
+                }
             }
         } label: {
             Text("Event")
+                .foregroundColor(themeManager.text)
         }
     }
 
@@ -408,7 +415,175 @@ private struct EventDetailView: View {
     }
 }
 
+// MARK: - Missing Screens (Minimal Implementations)
+// These are intentionally simple so the app compiles.
+// You can enhance them later without blocking builds.
+
+private struct AddEventSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @EnvironmentObject var themeManager: ThemeManager
+
+    @State private var name: String = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Event name") {
+                    TextField("Christmas Party", text: $name)
+                }
+            }
+            .navigationTitle("New Event")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(themeManager.primary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") { save() }
+                        .foregroundColor(themeManager.primary)
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // Your RunGameView preview proves Event(name:) exists.
+        let event = Event(name: trimmed)
+        context.insert(event)
+        try? context.save()
+        dismiss()
+    }
+}
+
+private struct ParticipantPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @EnvironmentObject var themeManager: ThemeManager
+
+    let event: Event
+
+    @Query(sort: \Person.displayName)
+    private var people: [Person]
+
+    @State private var selected: Set<UUID> = []
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(people.filter { $0.isActive }) { person in
+                    Button {
+                        toggle(person.id)
+                    } label: {
+                        HStack {
+                            Text(person.displayName)
+                            Spacer()
+                            if selected.contains(person.id) {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(themeManager.primary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Participants")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(themeManager.primary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { commit() }
+                        .foregroundColor(themeManager.primary)
+                }
+            }
+            .onAppear {
+                selected = Set(event.participantIds)
+            }
+        }
+    }
+
+    private func toggle(_ id: UUID) {
+        if selected.contains(id) {
+            selected.remove(id)
+        } else {
+            selected.insert(id)
+        }
+    }
+
+    private func commit() {
+        event.participantIds = Array(selected)
+        try? context.save()
+        dismiss()
+    }
+}
+
+private struct AddGamesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
+
+    let event: Event
+    let templates: [GameTemplate]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("This screen is a minimal placeholder so the project builds.")
+                        .foregroundStyle(.secondary)
+                    Text("Next step is wiring this to create EventGame records from selected GameTemplates.")
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Templates in catalog") {
+                    ForEach(templates) { t in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(t.name).font(.headline)
+                            if let group = t.groupName, !group.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text(group).font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Games")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") { dismiss() }
+                        .foregroundColor(themeManager.primary)
+                }
+            }
+        }
+    }
+}
+
+private struct EventGameDetailView: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    let event: Event
+    let eventGame: EventGame
+
+    var body: some View {
+        Form {
+            Section("Game") {
+                Text("This is a placeholder detail view.")
+                    .foregroundStyle(.secondary)
+            }
+            Section("IDs") {
+                Text("EventGame ID: \(eventGame.id.uuidString)")
+            }
+        }
+        .navigationTitle("Game Detail")
+    }
+}
+
+
 #Preview {
     EventsListView()
         .modelContainer(for: [Event.self, Person.self, GameTemplate.self])
+        .environmentObject(ThemeManager())
 }

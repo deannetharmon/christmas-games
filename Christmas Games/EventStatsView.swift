@@ -3,7 +3,7 @@ import SwiftData
 
 struct EventStatsView: View {
     @Environment(\.modelContext) private var context
-    @Environment(\.colorTheme) private var theme
+    @EnvironmentObject var themeManager: ThemeManager
 
     @Query(sort: \Event.createdAt, order: .reverse)
     private var allEvents: [Event]
@@ -19,12 +19,8 @@ struct EventStatsView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.gradientStart, theme.gradientEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            themeManager.background
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 eventPicker
@@ -44,10 +40,10 @@ struct EventStatsView: View {
         }
         .navigationTitle("Event Stats")
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Reset") { showResetConfirm = true }
+                    .foregroundColor(themeManager.text)
                     .disabled(selectedEventId == nil)
             }
         }
@@ -217,4 +213,5 @@ private struct PlayerStats: Identifiable {
         EventStatsView()
     }
     .modelContainer(for: [Event.self, Person.self])
+    .environmentObject(ThemeManager())
 }

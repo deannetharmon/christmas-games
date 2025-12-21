@@ -13,23 +13,15 @@ struct MainMenuView: View {
     @Query(sort: \GameTemplate.name)
     private var games: [GameTemplate]
     
-    @AppStorage("selectedTheme") private var selectedThemeRaw: String = ColorTheme.christmas.rawValue
-    @State private var showThemePicker = false
-    
-    private var selectedTheme: ColorTheme {
-        ColorTheme(rawValue: selectedThemeRaw) ?? .christmas
-    }
+    @StateObject private var themeManager = ThemeManager()
+    @State private var showThemeSettings = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Themed gradient background
-                LinearGradient(
-                    colors: [selectedTheme.gradientStart, selectedTheme.gradientEnd],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                // Solid color background based on theme
+                themeManager.background
+                    .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     header
@@ -38,6 +30,7 @@ struct MainMenuView: View {
                         VStack(spacing: 14) {
                             NavigationLink {
                                 EventsListView()
+                                    .environmentObject(themeManager)
                             } label: {
                                 MenuRow(
                                     title: "Events",
@@ -48,6 +41,7 @@ struct MainMenuView: View {
 
                             NavigationLink {
                                 GameCatalogView()
+                                    .environmentObject(themeManager)
                             } label: {
                                 MenuRow(
                                     title: "Game Catalog",
@@ -58,6 +52,7 @@ struct MainMenuView: View {
 
                             NavigationLink {
                                 ParticipantCatalogView()
+                                    .environmentObject(themeManager)
                             } label: {
                                 MenuRow(
                                     title: "Participant Catalog",
@@ -68,6 +63,7 @@ struct MainMenuView: View {
 
                             NavigationLink {
                                 EventStatsView()
+                                    .environmentObject(themeManager)
                             } label: {
                                 MenuRow(
                                     title: "Event Stats",
@@ -83,20 +79,21 @@ struct MainMenuView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showThemePicker = true
+                        showThemeSettings = true
                     } label: {
                         Image(systemName: "paintpalette.fill")
-                            .foregroundColor(.white)
+                            .foregroundColor(themeManager.text)
                             .font(.title3)
                     }
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showThemePicker) {
-                ThemePickerSheet(selectedTheme: $selectedThemeRaw)
+            .sheet(isPresented: $showThemeSettings) {
+                ThemeSettingsView()
+                    .environmentObject(themeManager)
             }
-            .environment(\.colorTheme, selectedTheme)
         }
+        .environmentObject(themeManager)
     }
 
     private var header: some View {
@@ -104,7 +101,7 @@ struct MainMenuView: View {
             Text("Harmon Family Games")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white)  // White text on colored background
+                .foregroundColor(themeManager.text)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 18)
@@ -144,76 +141,187 @@ private struct MenuRow: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(UIColor.systemBackground))  // White/dark background for cards
+                .fill(Color(UIColor.systemBackground))
                 .shadow(color: .black.opacity(0.15), radius: 5, x: 0, y: 2)
         )
         .contentShape(Rectangle())
     }
 }
 
-// MARK: - Theme Picker Sheet
+// MARK: - Theme Settings View
 
-struct ThemePickerSheet: View {
+struct ThemeSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Binding var selectedTheme: String
+    @EnvironmentObject var themeManager: ThemeManager
+    
+    @State private var selectedColor: Color = .red
+    @State private var themeIntensity: Double = 0.15
     
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(ColorTheme.allCases) { theme in
-                    Button {
-                        selectedTheme = theme.rawValue
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 16) {
-                            // Theme preview
-                            ZStack {
-                                LinearGradient(
-                                    colors: [theme.gradientStart, theme.gradientEnd],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                .frame(width: 60, height: 60)
+            ZStack {
+                themeManager.background
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Preview Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Preview")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(themeManager.primary)
+                            
+                            VStack(spacing: 16) {
+                                // Sample card showing how the theme looks
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Image(systemName: "star.fill")
+                                            .foregroundColor(themeManager.primary)
+                                        Text("Sample Item")
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                    }
+                                    Text("This is how text will appear with your theme")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding()
+                                .background(themeManager.card)
                                 .cornerRadius(12)
                                 
-                                Text(theme.icon)
-                                    .font(.title)
+                                // Sample button
+                                Button(action: {}) {
+                                    Text("Sample Button")
+                                        .font(.headline)
+                                        .foregroundColor(themeManager.onPrimary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(themeManager.primary)
+                                        .cornerRadius(12)
+                                }
                             }
+                        }
+                        .padding()
+                        .background(themeManager.card)
+                        .cornerRadius(12)
+                        
+                        // Color Picker Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Theme & Background")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(themeManager.primary)
                             
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(theme.rawValue)
-                                    .font(.headline)
+                            ColorPicker(selection: $selectedColor, supportsOpacity: false) {
+                                Text("Pick your primary color")
                                     .foregroundColor(.primary)
-                                
-                                // Team colors preview
-                                HStack(spacing: 4) {
-                                    ForEach(0..<min(6, theme.teamColors.count), id: \.self) { index in
-                                        Circle()
-                                            .fill(theme.teamColors[index])
-                                            .frame(width: 16, height: 16)
-                                    }
+                            }
+                            .padding()
+                            .background(themeManager.card)
+                            .cornerRadius(8)
+                            .onChange(of: selectedColor) { _, newValue in
+                                if let hex = newValue.toHex() {
+                                    themeManager.selectedThemeId = hex
                                 }
                             }
                             
-                            Spacer()
+                            // Intensity Slider
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Background Intensity")
+                                    Spacer()
+                                    Text("\(Int(themeIntensity * 100))%")
+                                        .font(.caption)
+                                        .bold()
+                                        .foregroundColor(themeManager.secondary)
+                                }
+                                
+                                Slider(value: $themeIntensity, in: 0.05...1.0, step: 0.05)
+                                    .tint(themeManager.primary)
+                                    .onChange(of: themeIntensity) { _, newValue in
+                                        themeManager.currentIntensity = newValue
+                                    }
+                            }
+                            .padding()
+                            .background(themeManager.card)
+                            .cornerRadius(8)
+                        }
+                        .padding()
+                        .background(themeManager.card)
+                        .cornerRadius(12)
+                        
+                        // Quick Color Presets
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Quick Presets")
+                                .font(.title2)
+                                .bold()
+                                .foregroundColor(themeManager.primary)
                             
-                            if selectedTheme == theme.rawValue {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.title2)
+                            LazyVGrid(columns: [
+                                GridItem(.flexible()),
+                                GridItem(.flexible()),
+                                GridItem(.flexible())
+                            ], spacing: 12) {
+                                ColorPresetButton(name: "Christmas", color: Color(hex: "B22222"), selectedColor: $selectedColor)
+                                ColorPresetButton(name: "Ocean", color: Color(hex: "1A5490"), selectedColor: $selectedColor)
+                                ColorPresetButton(name: "Forest", color: Color(hex: "228B22"), selectedColor: $selectedColor)
+                                ColorPresetButton(name: "Sunset", color: Color(hex: "CC5500"), selectedColor: $selectedColor)
+                                ColorPresetButton(name: "Purple", color: Color(hex: "6A0DAD"), selectedColor: $selectedColor)
+                                ColorPresetButton(name: "Classic", color: Color(hex: "007AFF"), selectedColor: $selectedColor)
                             }
                         }
-                        .padding(.vertical, 8)
+                        .padding()
+                        .background(themeManager.card)
+                        .cornerRadius(12)
                     }
+                    .padding()
                 }
             }
-            .navigationTitle("Choose Theme")
+            .navigationTitle("Theme Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(themeManager.primary)
                 }
             }
+        }
+        .onAppear {
+            selectedColor = Color(hex: themeManager.selectedThemeId)
+            themeIntensity = themeManager.currentIntensity
+        }
+    }
+}
+
+// MARK: - Color Preset Button
+
+private struct ColorPresetButton: View {
+    let name: String
+    let color: Color
+    @Binding var selectedColor: Color
+    
+    var body: some View {
+        Button {
+            selectedColor = color
+        } label: {
+            VStack(spacing: 8) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 2)
+                    )
+                
+                Text(name)
+                    .font(.caption)
+                    .foregroundColor(.primary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
         }
     }
 }

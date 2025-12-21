@@ -21,18 +21,18 @@ struct GameCatalogView: View {
     @State private var showAlert = false
     
     // Filter and sort state
-    @State private var filterTeamSize: Int? = nil
-    @State private var filterTeamCount: Int? = nil
-    @State private var sortOption: SortOption = .alphabetical
-    @State private var teamTypeFilter: TeamTypeFilter = .all
+    @AppStorage("gameCatalog_filterTeamSize") private var filterTeamSize: Int?
+    @AppStorage("gameCatalog_filterTeamCount") private var filterTeamCount: Int?
+    @AppStorage("gameCatalog_sortOption") private var sortOption: SortOption = .alphabetical
+    @AppStorage("gameCatalog_teamTypeFilter") private var teamTypeFilter: TeamTypeFilter = .all
     
-    enum SortOption: String, CaseIterable {
+    enum SortOption: String, CaseIterable, Codable {
         case alphabetical = "A-Z"
         case reverseAlphabetical = "Z-A"
         case status = "Status"
     }
     
-    enum TeamTypeFilter: String, CaseIterable {
+    enum TeamTypeFilter: String, CaseIterable, Codable {
         case all = "All"
         case any = "Any"
         case maleOnly = "Male Only"

@@ -3,7 +3,7 @@ import SwiftData
 
 struct RunGameView: View {
     @Environment(\.modelContext) private var context
-    @Environment(\.colorTheme) private var theme
+    @EnvironmentObject var themeManager: ThemeManager
 
     let event: Event
 
@@ -31,12 +31,8 @@ struct RunGameView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [theme.gradientStart, theme.gradientEnd],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            themeManager.background
+                .ignoresSafeArea()
 
             VStack(spacing: 12) {
                 content
@@ -50,7 +46,6 @@ struct RunGameView: View {
         }
         .navigationTitle("Run Game")
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 // Pause/Resume button
@@ -59,20 +54,24 @@ struct RunGameView: View {
                         do { try engine.pauseEvent(event) }
                         catch { show(error) }
                     }
+                    .foregroundColor(themeManager.text)
                 } else if event.status == .paused {
                     Button("Resume") {
                         do { try engine.resumeEvent(event) }
                         catch { show(error) }
                     }
+                    .foregroundColor(themeManager.text)
                 }
                 
                 // Skip Game button (only when game is active and not paused)
                 if currentGame != nil && event.status == .active {
                     Button("Skip Game") { showSkipConfirmation = true }
+                        .foregroundColor(themeManager.text)
                 }
                 
                 // Pick Game button
                 Button("Pick Game") { showPickNextGame = true }
+                    .foregroundColor(themeManager.text)
                     .disabled(event.status == .paused)
             }
         }
@@ -80,6 +79,7 @@ struct RunGameView: View {
             PickNextGameSheet(event: event) { selection, skipMode in
                 handlePick(selection: selection, skipMode: skipMode)
             }
+            .environmentObject(themeManager)
         }
         .alert("Message", isPresented: $showMessage) {
             Button("OK", role: .cancel) { }
@@ -97,6 +97,14 @@ struct RunGameView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will reset all games to 'not started', delete all rounds and statistics. Participants will be kept.")
+        }
+        .confirmationDialog("Skip Current Game", isPresented: $showSkipConfirmation, titleVisibility: .visible) {
+            Button("Skip to Next Game", role: .destructive) {
+                handleSkipGame()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will skip the current game and move to the next available game. Current players will be carried over if possible.")
         }
     }
 
@@ -249,6 +257,7 @@ struct RunGameView: View {
                     }
                 } catch { show(error) }
             }
+            .environmentObject(themeManager)
         }
         .confirmationDialog("Play another round of this game?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
             Button("Yes – New Round") {
@@ -445,12 +454,104 @@ struct PickNextGameSheet: View {
 
     @Query(sort: \GameTemplate.name)
     private var templates: [GameTemplate]
+    
+    // Filter and sort state
+    @State private var searchText = ""
+    @AppStorage("pickNextGame_filterTeamSize") private var filterTeamSize: Int?
+    @AppStorage("pickNextGame_filterTeamCount") private var filterTeamCount: Int?
+    @AppStorage("pickNextGame_sortOption") private var sortOption: SortOption = .orderIndex
+    @AppStorage("pickNextGame_teamTypeFilter") private var teamTypeFilter: TeamTypeFilter = .all
+    @AppStorage("pickNextGame_statusFilter") private var statusFilter: StatusFilter = .active
+    
+    enum SortOption: String, CaseIterable, Codable {
+        case orderIndex = "Order"
+        case alphabetical = "A-Z"
+        case reverseAlphabetical = "Z-A"
+    }
+    
+    enum TeamTypeFilter: String, CaseIterable, Codable {
+        case all = "All"
+        case any = "Any"
+        case maleOnly = "Male Only"
+        case femaleOnly = "Female Only"
+        case couplesOnly = "Couples Only"
+    }
+    
+    enum StatusFilter: String, CaseIterable, Codable {
+        case active = "Active"
+        case notStarted = "Not Started"
+        case allGames = "All Games"
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Eligible (not started)") {
-                    ForEach(eligibleGames) { eg in
+                // Filters section
+                Section {
+                    // Search bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search games...", text: $searchText)
+                            .textFieldStyle(.plain)
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    
+                    HStack {
+                        Picker("Team Size", selection: $filterTeamSize) {
+                            Text("Any").tag(nil as Int?)
+                            ForEach(availableTeamSizes, id: \.self) { size in
+                                Text("\(size)").tag(size as Int?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        Picker("Teams", selection: $filterTeamCount) {
+                            Text("Any").tag(nil as Int?)
+                            ForEach(availableTeamCounts, id: \.self) { count in
+                                Text("\(count)").tag(count as Int?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    HStack {
+                        Picker("Sort", selection: $sortOption) {
+                            ForEach(SortOption.allCases, id: \.self) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        
+                        Picker("Team Type", selection: $teamTypeFilter) {
+                            ForEach(TeamTypeFilter.allCases, id: \.self) { filter in
+                                Text(filter.rawValue).tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    Picker("Status", selection: $statusFilter) {
+                        ForEach(StatusFilter.allCases, id: \.self) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("\(statusFilter.rawValue) Games (\(filteredAndSortedGames.count))")
+                }
+                
+                // Eligible games list
+                Section("Select Game") {
+                    ForEach(filteredAndSortedGames) { eg in
                         Button {
                             onPick(eg, nil)
                             dismiss()
@@ -460,19 +561,22 @@ struct PickNextGameSheet: View {
                     }
                 }
 
-                Section("Skip options") {
-                    ForEach(eligibleGames) { eg in
-                        Menu {
-                            Button("Push to later") {
-                                onPick(eg, .pushLater)
-                                dismiss()
+                // Skip options
+                if !filteredAndSortedGames.isEmpty {
+                    Section("Skip Options") {
+                        ForEach(filteredAndSortedGames) { eg in
+                            Menu {
+                                Button("Push to later") {
+                                    onPick(eg, .pushLater)
+                                    dismiss()
+                                }
+                                Button("Remove from event", role: .destructive) {
+                                    onPick(eg, .remove)
+                                    dismiss()
+                                }
+                            } label: {
+                                Text("Skip \(gameName(for: eg))")
                             }
-                            Button("Remove from event", role: .destructive) {
-                                onPick(eg, .remove)
-                                dismiss()
-                            }
-                        } label: {
-                            Text("Skip \(gameName(for: eg))")
                         }
                     }
                 }
@@ -485,11 +589,131 @@ struct PickNextGameSheet: View {
             }
         }
     }
+    
+    // MARK: - Computed Properties
+    
+    private var availableTeamSizes: [Int] {
+        let sizes = eligibleGames.compactMap { eg -> Int? in
+            let t = template(for: eg)
+            return eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam
+        }
+        return Array(Set(sizes)).sorted()
+    }
+    
+    private var availableTeamCounts: [Int] {
+        let counts = eligibleGames.compactMap { eg -> Int? in
+            let t = template(for: eg)
+            return eg.overrideTeamCount ?? t?.defaultTeamCount
+        }
+        return Array(Set(counts)).sorted()
+    }
 
     private var eligibleGames: [EventGame] {
-        event.eventGames
-            .filter { $0.status == .notStarted }
-            .sorted { $0.orderIndex < $1.orderIndex }
+        let games = event.eventGames
+        
+        switch statusFilter {
+        case .notStarted:
+            // Only show games that haven't been touched
+            return games.filter { $0.status == .notStarted }
+            
+        case .active:
+            // Show games that haven't had a winner recorded yet
+            return games.filter { eg in
+                // Include not started games
+                if eg.status == .notStarted {
+                    return true
+                }
+                
+                // Include in-progress games that don't have a completed round with a winner
+                if eg.status == .inProgress {
+                    let hasCompletedRoundWithWinner = eg.rounds.contains { round in
+                        round.completedAt != nil && 
+                        (round.winningTeamId != nil || round.resultType == .tie)
+                    }
+                    return !hasCompletedRoundWithWinner
+                }
+                
+                return false
+            }
+            
+        case .allGames:
+            // Show everything
+            return games
+        }
+    }
+    
+    private var filteredAndSortedGames: [EventGame] {
+        var result = eligibleGames
+        
+        // Apply search filter
+        if !searchText.isEmpty {
+            result = result.filter { eg in
+                let t = template(for: eg)
+                let name = t?.name ?? ""
+                let group = t?.groupName ?? ""
+                return name.localizedCaseInsensitiveContains(searchText) ||
+                       group.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        // Apply team size filter
+        if let filterTeamSize {
+            result = result.filter { eg in
+                let t = template(for: eg)
+                let size = eg.overridePlayersPerTeam ?? t?.defaultPlayersPerTeam ?? 0
+                return size == filterTeamSize
+            }
+        }
+        
+        // Apply team count filter
+        if let filterTeamCount {
+            result = result.filter { eg in
+                let t = template(for: eg)
+                let count = eg.overrideTeamCount ?? t?.defaultTeamCount ?? 0
+                return count == filterTeamCount
+            }
+        }
+        
+        // Apply team type filter
+        if teamTypeFilter != .all {
+            result = result.filter { eg in
+                let t = template(for: eg)
+                let teamType = eg.overrideTeamType ?? t?.defaultTeamType ?? .any
+                
+                switch teamTypeFilter {
+                case .all:
+                    return true
+                case .any:
+                    return teamType == .any
+                case .maleOnly:
+                    return teamType == .maleOnly
+                case .femaleOnly:
+                    return teamType == .femaleOnly
+                case .couplesOnly:
+                    return teamType == .couplesOnly
+                }
+            }
+        }
+        
+        // Apply sort
+        switch sortOption {
+        case .orderIndex:
+            result.sort { $0.orderIndex < $1.orderIndex }
+        case .alphabetical:
+            result.sort { eg1, eg2 in
+                let n1 = gameName(for: eg1)
+                let n2 = gameName(for: eg2)
+                return n1.localizedCaseInsensitiveCompare(n2) == .orderedAscending
+            }
+        case .reverseAlphabetical:
+            result.sort { eg1, eg2 in
+                let n1 = gameName(for: eg1)
+                let n2 = gameName(for: eg2)
+                return n1.localizedCaseInsensitiveCompare(n2) == .orderedDescending
+            }
+        }
+        
+        return result
     }
 
     private func template(for eg: EventGame) -> GameTemplate? {
@@ -582,4 +806,5 @@ struct SwapPlayerSheet: View {
         RunGameView(event: event)
     }
     .modelContainer(container)
+    .environmentObject(ThemeManager())
 }
