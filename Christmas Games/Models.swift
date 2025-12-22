@@ -285,6 +285,7 @@ final class Round {
 
     var resultTypeRaw: String?
     var winningTeamId: UUID?
+  
 
     init(
         id: UUID = UUID(),

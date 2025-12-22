@@ -15,6 +15,7 @@ struct MainMenuView: View {
     
     @StateObject private var themeManager = ThemeManager()
     @State private var showThemeSettings = false
+    @State private var showGameSettings = false
 
     var body: some View {
         NavigationStack {
@@ -77,7 +78,15 @@ struct MainMenuView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        showGameSettings = true
+                    } label: {
+                        Image(systemName: "gear")
+                            .foregroundColor(themeManager.text)
+                            .font(.title3)
+                    }
+                    
                     Button {
                         showThemeSettings = true
                     } label: {
@@ -90,6 +99,10 @@ struct MainMenuView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(isPresented: $showThemeSettings) {
                 ThemeSettingsView()
+                    .environmentObject(themeManager)
+            }
+            .sheet(isPresented: $showGameSettings) {
+                GameSettingsView()
                     .environmentObject(themeManager)
             }
         }

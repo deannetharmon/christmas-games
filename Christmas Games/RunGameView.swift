@@ -24,11 +24,72 @@ struct RunGameView: View {
     @State private var swapOutgoing: UUID?
 
     @State private var showAfterRoundDialog = false
-    @State private var showAfterGameDialog = false
+    @State private var isInPostRoundDecision = false
 
     @State private var showWinnerPicker = false
     @State private var showSkipConfirmation = false
+    @State private var showEventStats = false
+    
+    @State private var showTransition = false
+    @State private var pendingNextGame: EventGame?
+    @State private var pendingShowAfterRoundDialog = false
+    
+    @State private var selectedWinnerTeamId: UUID?
+    @State private var selectedSecondTeamId: UUID?
+    @State private var showSecondPlacePicker = false
+    @State private var showThirdPlacePicker = false
 
+
+    
+    // Winner celebration settings
+    @AppStorage("winnerCelebration_enabled") private var winnerCelebrationEnabled: Bool = true
+    @AppStorage("winnerCelebration_showForMultiRound") private var showCelebrationForMultiRound: Bool = false
+    @AppStorage("winnerCelebration_useGifs") private var winnerCelebrationUseGifs: Bool = true
+
+    // Winner celebration state
+    @State private var showWinnerCelebrationOverlay = false
+    @State private var celebrationTitle: String = ""
+    @State private var celebrationLines: [String] = []
+    
+    @ViewBuilder
+    private var winnerCelebrationLayer: some View {
+        if showWinnerCelebrationOverlay {
+            WinnerCelebrationOverlay(
+                title: celebrationTitle,
+                lines: celebrationLines,
+                useGifs: winnerCelebrationUseGifs,
+                onNext: {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showWinnerCelebrationOverlay = false
+                    }
+
+                    // Always go to post-round menu after celebration
+                    pendingShowAfterRoundDialog = false
+                    isInPostRoundDecision = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        showAfterRoundDialog = true
+                    }
+                },
+                onClose: {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        showWinnerCelebrationOverlay = false
+                    }
+
+                    // Always go to post-round menu after celebration, even on Close
+                    pendingShowAfterRoundDialog = false
+                    isInPostRoundDecision = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        showAfterRoundDialog = true
+                    }
+                },
+            )
+            .transition(.opacity.combined(with: .scale))
+            .zIndex(200)
+        }
+    }
+
+    
+    
     var body: some View {
         ZStack {
             themeManager.background
@@ -43,10 +104,35 @@ struct RunGameView: View {
             if event.status == .paused {
                 pausedOverlay
             }
+
+            // ✅ ADD THIS (winner overlay)
+            winnerCelebrationLayer
+
+            if showTransition {
+                GameTransitionView {
+                    completeTransition()
+                }
+                .transition(.opacity)
+                .zIndex(100)
+            }
+
         }
         .navigationTitle("Run Game")
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Menu {
+                    Button {
+                        showEventStats = true
+                    } label: {
+                        Label("View Stats", systemImage: "chart.bar.fill")
+                    }
+                } label: {
+                    Text("Event")
+                        .foregroundColor(themeManager.text)
+                }
+            }
+            
             ToolbarItemGroup(placement: .topBarTrailing) {
                 // Pause/Resume button
                 if event.status == .active {
@@ -80,6 +166,78 @@ struct RunGameView: View {
                 handlePick(selection: selection, skipMode: skipMode)
             }
             .environmentObject(themeManager)
+        }
+        .sheet(isPresented: $showEventStats) {
+            CurrentEventStatsSheet(event: event)
+                .environmentObject(themeManager)
+                .onDisappear {
+                    // Reshow dialog if we were in post-round decision mode
+                    if isInPostRoundDecision {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showAfterRoundDialog = true
+                        }
+                    }
+                }
+        }
+        .confirmationDialog("What would you like to do next?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
+            if let eg = currentGame {
+                Button("Play Another Round") {
+                    do { 
+                        _ = try engine.createNextRound(for: eg)
+                        isInPostRoundDecision = false
+                        showAfterRoundDialog = false
+                    } catch { 
+                        show(error) 
+                    }
+                }
+                
+                Button("Continue to Next Game") {
+                    isInPostRoundDecision = false
+                    showAfterRoundDialog = false
+                    handlePickNextGameRandom(currentGame: eg)
+                }
+                
+                Button("Manually Choose Next Game") {
+                    isInPostRoundDecision = false
+                    showAfterRoundDialog = false
+                    showPickNextGame = true
+                }
+                
+                Button("View Event Stats") {
+                    showEventStats = true
+                    // Don't clear isInPostRoundDecision - we want to come back
+                }
+            }
+        }
+        .confirmationDialog("Select 2nd place", isPresented: $showSecondPlacePicker, titleVisibility: .visible) {
+            if let round = currentRound, let winnerId = selectedWinnerTeamId {
+                ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
+                    if t.id != winnerId {
+                        Button("2nd: Team \(teamLabel(index)) – \(teamNames(t))") {
+                            showSecondPlacePicker = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                completeSecondPlace(for: round, secondId: t.id)
+                            }
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .confirmationDialog("Select 3rd place", isPresented: $showThirdPlacePicker, titleVisibility: .visible) {
+            if let round = currentRound, let winnerId = selectedWinnerTeamId, let secondId = selectedSecondTeamId {
+                ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
+                    if t.id != winnerId && t.id != secondId {
+                        Button("3rd: Team \(teamLabel(index)) – \(teamNames(t))") {
+                            showThirdPlacePicker = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                completeThirdPlace(for: round, thirdId: t.id)
+                            }
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
         }
         .alert("Message", isPresented: $showMessage) {
             Button("OK", role: .cancel) { }
@@ -174,7 +332,36 @@ struct RunGameView: View {
             if let round = currentRound {
                 roundCard(template: template, eventGame: eg, round: round)
             } else {
-                Text("No active round.").foregroundStyle(.secondary)
+                // No active round - either all rounds complete or none created yet
+                VStack(spacing: 16) {
+                    if eg.rounds.isEmpty {
+                        Text("No rounds created yet.")
+                            .foregroundStyle(.secondary)
+                        
+                        Button("Start First Round") {
+                            do {
+                                _ = try engine.createNextRound(for: eg)
+                            } catch {
+                                show(error)
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(event.status == .paused)
+                    } else {
+                        // All rounds are complete - ready for next game
+                        Text("All rounds complete!")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                        
+                        Button("Choose Next Game") {
+                            isInPostRoundDecision = true
+                            showAfterRoundDialog = true
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(event.status == .paused)
+                    }
+                }
+                .padding()
             }
         } else {
             emptyState
@@ -259,21 +446,6 @@ struct RunGameView: View {
             }
             .environmentObject(themeManager)
         }
-        .confirmationDialog("Play another round of this game?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
-            Button("Yes – New Round") {
-                do { _ = try engine.createNextRound(for: eventGame) }
-                catch { show(error) }
-            }
-            Button("No – Next Game") { showAfterGameDialog = true }
-            Button("Cancel", role: .cancel) { }
-        }
-        .confirmationDialog("Next game", isPresented: $showAfterGameDialog, titleVisibility: .visible) {
-            Button("Pick next game (random)") {
-                handlePickNextGameRandom(currentGame: eventGame)
-            }
-            Button("Choose from list") { showPickNextGame = true }
-            Button("Cancel", role: .cancel) { }
-        }
     }
 
     private func teamsList(round: Round) -> some View {
@@ -330,22 +502,92 @@ struct RunGameView: View {
             ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
                 Button("Team \(teamLabel(index)) – \(teamNames(t))") {
                     do {
-                        try engine.finalizeRound(round, winnerTeamId: t.id)
-                        showAfterRoundDialog = true
-                    } catch { show(error) }
+                        selectedWinnerTeamId = t.id
+                        showWinnerPicker = false
+
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            beginPlacementFlow(for: round)
+                        }
+
+                    } catch {
+                        show(error)
+                    }
                 }
             }
 
             Button("Tie") {
                 do {
                     try engine.finalizeRound(round, winnerTeamId: nil)
-                    showAfterRoundDialog = true
-                } catch { show(error) }
+                    showWinnerPicker = false
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        handleRoundFinalized(round: round, winnerTeamId: nil)
+                    }
+                } catch {
+                    show(error)
+                }
             }
 
             Button("Cancel", role: .cancel) { }
         }
     }
+
+    // MARK: - Placement Flow (1st / 2nd / 3rd)
+
+    private func beginPlacementFlow(for round: Round) {
+        guard let winnerId = selectedWinnerTeamId else { return }
+        let teamCount = round.teams.count
+
+        // 2 teams: auto-assign 2nd as the other team
+        if teamCount <= 2 {
+            let second = round.teams.first(where: { $0.id != winnerId })?.id
+            do {
+                try engine.finalizeRound(round, winnerTeamId: winnerId, secondTeamId: second, thirdTeamId: nil)
+                handleRoundFinalized(round: round, winnerTeamId: winnerId)
+            } catch {
+                show(error)
+            }
+            return
+        }
+
+        // 3+ teams: ask for 2nd place
+        selectedSecondTeamId = nil
+        showSecondPlacePicker = true
+    }
+
+    private func completeSecondPlace(for round: Round, secondId: UUID) {
+        selectedSecondTeamId = secondId
+        guard let winnerId = selectedWinnerTeamId else { return }
+
+        let teamCount = round.teams.count
+
+        // 3 teams: auto-assign 3rd as the remaining team
+        if teamCount == 3 {
+            let third = round.teams.map(\.id).first(where: { $0 != winnerId && $0 != secondId })
+            do {
+                try engine.finalizeRound(round, winnerTeamId: winnerId, secondTeamId: secondId, thirdTeamId: third)
+                handleRoundFinalized(round: round, winnerTeamId: winnerId)
+            } catch {
+                show(error)
+            }
+            return
+        }
+
+        // 4+ teams: ask for 3rd place
+        showThirdPlacePicker = true
+    }
+
+    private func completeThirdPlace(for round: Round, thirdId: UUID) {
+        guard let winnerId = selectedWinnerTeamId, let secondId = selectedSecondTeamId else { return }
+        do {
+            try engine.finalizeRound(round, winnerTeamId: winnerId, secondTeamId: secondId, thirdTeamId: thirdId)
+            handleRoundFinalized(round: round, winnerTeamId: winnerId)
+        } catch {
+            show(error)
+        }
+    }
+
+
 
     private func previousRoundsCompact(eventGame: EventGame) -> some View {
         let completed = eventGame.rounds
@@ -379,15 +621,97 @@ struct RunGameView: View {
         return "Round \(round.roundIndex + 1): Completed"
     }
 
+    private func handleRoundFinalized(round: Round, winnerTeamId: UUID?) {
+        showTransition = false
+        pendingNextGame = nil
+
+        let shouldCelebrate = shouldShowWinnerCelebration(for: round)
+
+        if winnerCelebrationEnabled && shouldCelebrate {
+            buildCelebrationPayload(round: round, winnerTeamId: winnerTeamId)
+
+            pendingShowAfterRoundDialog = true
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                showWinnerCelebrationOverlay = true
+            }
+        } else {
+            isInPostRoundDecision = true
+            showAfterRoundDialog = true
+        }
+
+    }
+
+
+    private func shouldShowWinnerCelebration(for round: Round) -> Bool {
+        // If you later add "roundsPerGame" to templates, this can be more intelligent.
+        // For now: treat "multi-round" as "this game already has completed rounds."
+        // i.e., if there were previous completed rounds, default to NOT celebrating unless user enables it.
+        guard let eg = round.eventGame else { return true }
+        let completedRoundCount = eg.rounds.filter { $0.completedAt != nil }.count
+
+        if completedRoundCount > 1 { // means we are in a game that has been played across multiple rounds
+            return showCelebrationForMultiRound
+        }
+        return true
+    }
+
+    private func buildCelebrationPayload(round: Round, winnerTeamId: UUID?) {
+        if round.resultType == .tie || winnerTeamId == nil {
+            celebrationTitle = "It’s a Tie!"
+            celebrationLines = ["Everyone takes 1st place"]
+            return
+        }
+
+        // Build 1st/2nd place lines using round.placements computed by EventEngine.finalizeRound
+        // placements: [personId: placementInt]
+        let placements = round.placements
+
+        let first = placements
+            .filter { $0.value == 1 }
+            .compactMap { peopleById[$0.key]?.displayName }
+            .sorted()
+
+        let second = placements
+            .filter { $0.value == 2 }
+            .compactMap { peopleById[$0.key]?.displayName }
+            .sorted()
+
+        let third = placements
+            .filter { $0.value == 3 }
+            .compactMap { peopleById[$0.key]?.displayName }
+            .sorted()
+
+        celebrationTitle = "Congratulations!"
+        var lines: [String] = []
+
+        if !first.isEmpty {
+            lines.append("1st Place: " + first.joined(separator: ", "))
+        }
+        if !second.isEmpty {
+            lines.append("2nd Place: " + second.joined(separator: ", "))
+        }
+        if !third.isEmpty {
+            lines.append("3rd Place: " + third.joined(separator: ", "))
+        }
+
+        if lines.isEmpty {
+            lines = ["Winners recorded"]
+        }
+
+        celebrationLines = lines
+    }
+
+    
     private func handlePickNextGameRandom(currentGame: EventGame) {
         do {
             try engine.completeGame(currentGame)
             
             if let next = try engine.pickNextGameRandom(event: event) {
-                try engine.start(event: event, eventGame: next)
-                
-                // Force view refresh by saving again
-                try context.save()
+                // Store the next game and show transition
+                pendingNextGame = next
+                withAnimation {
+                    showTransition = true
+                }
             } else {
                 event.status = .completed
                 try context.save()
@@ -405,13 +729,40 @@ struct RunGameView: View {
                 return
             }
 
-            if let cg = currentGame { try engine.completeGame(cg) }
-            try engine.start(event: event, eventGame: selection)
+            // Complete current game if there is one
+            if let cg = currentGame { 
+                try engine.completeGame(cg) 
+            }
             
-            // Force view refresh
-            try context.save()
+            // Store the next game and show transition
+            pendingNextGame = selection
+            withAnimation {
+                showTransition = true
+            }
         } catch {
             show(error)
+        }
+    }
+    
+    private func completeTransition() {
+        do {
+            // Start the pending game
+            if let nextGame = pendingNextGame {
+                try engine.start(event: event, eventGame: nextGame)
+                try context.save()
+            }
+            
+            // Hide transition
+            withAnimation {
+                showTransition = false
+            }
+            pendingNextGame = nil
+        } catch {
+            show(error)
+            withAnimation {
+                showTransition = false
+            }
+            pendingNextGame = nil
         }
     }
 

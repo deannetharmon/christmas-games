@@ -68,6 +68,7 @@ private struct EventDetailView: View {
     @State private var showAddGame = false
     @State private var showPlayers = false
     @State private var showResetConfirm = false
+    @State private var showEventStats = false
 
     @State private var message: String?
     @State private var showMessage = false
@@ -198,10 +199,17 @@ private struct EventDetailView: View {
             }
             .scrollContentBackground(.hidden)
         }
-        .navigationTitle(event.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(event.name)
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .foregroundColor(themeManager.text)
+            }
+            
             ToolbarItem(placement: .topBarLeading) {
                 lifecycleButton
             }
@@ -216,6 +224,10 @@ private struct EventDetailView: View {
         }
         .sheet(isPresented: $showAddGame) {
             AddGamesSheet(event: event, templates: templates)
+                .environmentObject(themeManager)
+        }
+        .sheet(isPresented: $showEventStats) {
+            CurrentEventStatsSheet(event: event)
                 .environmentObject(themeManager)
         }
         .alert("Message", isPresented: $showMessage) {
@@ -345,6 +357,14 @@ private struct EventDetailView: View {
                 } catch {
                     present(error)
                 }
+            }
+            
+            Divider()
+            
+            Button {
+                showEventStats = true
+            } label: {
+                Label("View Stats", systemImage: "chart.bar.fill")
             }
         } label: {
             Text("Event")

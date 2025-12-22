@@ -330,43 +330,64 @@ func resetEvent(_ event: Event) throws {
         try context.save()
     }
 
-    func finalizeRound(_ round: Round, winnerTeamId: UUID?) throws {
-    round.completedAt = Date()
+    func finalizeRound(
+        _ round: Round,
+        winnerTeamId: UUID?,
+        secondTeamId: UUID? = nil,
+        thirdTeamId: UUID? = nil
+    ) throws {
+        round.completedAt = Date()
 
-    // Calculate placements for all participants
-    var placements: [UUID: Int] = [:]
-    
-    if let winnerTeamId {
-        // Winner case
+        // Tie: everyone gets 1st place
+        if winnerTeamId == nil {
+            round.resultType = .tie
+            round.winningTeamId = nil
+
+            var placements: [UUID: Int] = [:]
+            for team in round.teams {
+                for personId in team.memberPersonIds {
+                    placements[personId] = 1
+                }
+            }
+            round.placements = placements
+
+            if let event = round.eventGame?.event { touch(event) }
+            try context.save()
+            return
+        }
+
+        // Win: record winner + placements
         round.resultType = .win
         round.winningTeamId = winnerTeamId
-        
-        // Assign placements
-        for team in round.teams {
-            let placement = (team.id == winnerTeamId) ? 1 : 2
-            for personId in team.memberPersonIds {
-                placements[personId] = placement
-            }
-        }
-    } else {
-        // Tie case - everyone gets 1st place
-        round.resultType = .tie
-        round.winningTeamId = nil
-        
-        for team in round.teams {
-            for personId in team.memberPersonIds {
-                placements[personId] = 1
-            }
-        }
-    }
-    
-    round.placements = placements
 
-    if let event = round.eventGame?.event {
-        touch(event)
+        guard let winnerTeam = round.teams.first(where: { $0.id == winnerTeamId }) else {
+            // If teams changed unexpectedly, still save completion state
+            if let event = round.eventGame?.event { touch(event) }
+            try context.save()
+            return
+        }
+
+        var placements: [UUID: Int] = [:]
+
+        // 1st place: winner team members
+        for pid in winnerTeam.memberPersonIds { placements[pid] = 1 }
+
+        // 2nd place (optional)
+        if let secondTeamId, let secondTeam = round.teams.first(where: { $0.id == secondTeamId }) {
+            for pid in secondTeam.memberPersonIds { placements[pid] = 2 }
+        }
+
+        // 3rd place (optional)
+        if let thirdTeamId, let thirdTeam = round.teams.first(where: { $0.id == thirdTeamId }) {
+            for pid in thirdTeam.memberPersonIds { placements[pid] = 3 }
+        }
+
+        round.placements = placements
+
+        if let event = round.eventGame?.event { touch(event) }
+        try context.save()
     }
-    try context.save()
-}
+
 
     // MARK: - Helpers
 
