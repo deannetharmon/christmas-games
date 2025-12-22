@@ -21,7 +21,7 @@ struct EventStatsView: View {
     @State private var sortAscending: Bool = true
 
     enum SortColumn {
-        case name, games, first, second, third, rank
+        case name, games, rounds, first, second, third, rank
     }
 
     var body: some View {
@@ -94,37 +94,48 @@ struct EventStatsView: View {
 
         for event in eventsToAnalyze {
             for eventGame in event.eventGames {
+                var peopleInThisGame: Set<UUID> = []
+
                 for round in eventGame.rounds where round.completedAt != nil {
+                    let participantsInRound: Set<UUID> = Set(round.teams.flatMap { $0.memberPersonIds })
 
-                    // Process placements
-                    for (personId, placement) in round.placements {
+                    // Rounds Played
+                    for personId in participantsInRound {
                         var stat = statsDict[personId] ?? PlayerStats(personId: personId)
-                        stat.gamesPlayed += 1
-
-                        switch placement {
-                        case 1: stat.firstPlace += 1
-                        case 2: stat.secondPlace += 1
-                        case 3: stat.thirdPlace += 1
-                        default: break
-                        }
-
+                        stat.roundsPlayed += 1
                         statsDict[personId] = stat
                     }
 
-                    // Handle ties (when resultType == .tie and winningTeamId == nil)
-                    if round.resultType == .tie, round.winningTeamId == nil {
-                        for team in round.teams {
-                            for personId in team.memberPersonIds {
-                                var stat = statsDict[personId] ?? PlayerStats(personId: personId)
-                                if round.placements[personId] == nil {
-                                    stat.gamesPlayed += 1
-                                }
-                                // Tie counts as 1st place for all
-                                stat.firstPlace += 1
-                                statsDict[personId] = stat
+                    // For Games Played rollup
+                    peopleInThisGame.formUnion(participantsInRound)
+
+                    // Placements
+                    if !round.placements.isEmpty {
+                        for (personId, placement) in round.placements {
+                            var stat = statsDict[personId] ?? PlayerStats(personId: personId)
+                            switch placement {
+                            case 1: stat.firstPlace += 1
+                            case 2: stat.secondPlace += 1
+                            case 3: stat.thirdPlace += 1
+                            default: break
                             }
+                            statsDict[personId] = stat
+                        }
+                    } else if round.resultType == .tie, round.winningTeamId == nil {
+                        // Tie with no placements recorded: everyone in the round gets 1st
+                        for personId in participantsInRound {
+                            var stat = statsDict[personId] ?? PlayerStats(personId: personId)
+                            stat.firstPlace += 1
+                            statsDict[personId] = stat
                         }
                     }
+                }
+
+                // Games Played: +1 per game if person participated in any completed round within that game
+                for personId in peopleInThisGame {
+                    var stat = statsDict[personId] ?? PlayerStats(personId: personId)
+                    stat.gamesPlayed += 1
+                    statsDict[personId] = stat
                 }
             }
         }
@@ -150,6 +161,8 @@ struct EventStatsView: View {
             }
         case .games:
             result.sort { sortAscending ? $0.gamesPlayed < $1.gamesPlayed : $0.gamesPlayed > $1.gamesPlayed }
+        case .rounds:
+            result.sort { sortAscending ? $0.roundsPlayed < $1.roundsPlayed : $0.roundsPlayed > $1.roundsPlayed }
         case .first:
             result.sort { sortAscending ? $0.firstPlace < $1.firstPlace : $0.firstPlace > $1.firstPlace }
         case .second:
@@ -179,8 +192,7 @@ struct EventStatsView: View {
             sortAscending.toggle()
         } else {
             sortColumn = column
-            // Name defaults to A-Z, numbers default to high-to-low
-            sortAscending = (column == .name)
+            sortAscending = (column == .name) // Name defaults A-Z, numbers default high-to-low
         }
     }
 
@@ -201,7 +213,13 @@ struct EventStatsView: View {
 
                     Button(action: { toggleSort(column: .games) }) {
                         Text("Games\(sortIndicator(for: .games))")
-                            .frame(width: 50)
+                            .frame(width: 52)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { toggleSort(column: .rounds) }) {
+                        Text("Rounds\(sortIndicator(for: .rounds))")
+                            .frame(width: 60)
                     }
                     .buttonStyle(.plain)
 
@@ -238,7 +256,9 @@ struct EventStatsView: View {
                     Text(stat.displayName)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("\(stat.gamesPlayed)").frame(width: 50)
+                    Text("\(stat.gamesPlayed)").frame(width: 52)
+                    Text("\(stat.roundsPlayed)").frame(width: 60)
+
                     Text("\(stat.firstPlace)").frame(width: 40)
                     Text("\(stat.secondPlace)").frame(width: 40)
                     Text("\(stat.thirdPlace)").frame(width: 40)
@@ -274,11 +294,19 @@ struct EventStatsView: View {
 private struct PlayerStats: Identifiable {
     let id = UUID()
     let personId: UUID
+
     var displayName: String = ""
+
+    /// Number of EventGames the player participated in (>= 1 completed round within the game)
     var gamesPlayed: Int = 0
+
+    /// Number of completed rounds the player participated in (appeared on any team)
+    var roundsPlayed: Int = 0
+
     var firstPlace: Int = 0
     var secondPlace: Int = 0
     var thirdPlace: Int = 0
+
     var totalPoints: Int = 0
     var rank: Int = 0
 }

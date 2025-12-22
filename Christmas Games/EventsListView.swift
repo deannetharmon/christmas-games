@@ -170,7 +170,12 @@ private struct EventDetailView: View {
 
                 Section {
                     Button("Participants") { showPlayers = true }
-                        .disabled(event.participantIds.isEmpty)
+                    Button {
+                        showPlayers = true
+                    } label: {
+                        Label("Manage Participants", systemImage: "person.3")
+                    }
+
                 } header: {
                     Text("Manage")
                 }
@@ -365,6 +370,11 @@ private struct EventDetailView: View {
                 showEventStats = true
             } label: {
                 Label("View Stats", systemImage: "chart.bar.fill")
+            }
+            Button {
+                showPlayers = true
+            } label: {
+                Label("Manage Participants", systemImage: "person.3")
             }
         } label: {
             Text("Event")

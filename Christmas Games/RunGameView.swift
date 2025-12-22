@@ -12,13 +12,12 @@ struct RunGameView: View {
 
     @Query(sort: \GameTemplate.name)
     private var templates: [GameTemplate]
-    
+
     @State private var message: String?
     @State private var showMessage = false
 
     @State private var showPickNextGame = false
     @State private var showResetConfirm = false
-
 
     @State private var showSwap = false
     @State private var swapOutgoing: UUID?
@@ -29,18 +28,16 @@ struct RunGameView: View {
     @State private var showWinnerPicker = false
     @State private var showSkipConfirmation = false
     @State private var showEventStats = false
-    
+
     @State private var showTransition = false
     @State private var pendingNextGame: EventGame?
     @State private var pendingShowAfterRoundDialog = false
-    
+
     @State private var selectedWinnerTeamId: UUID?
     @State private var selectedSecondTeamId: UUID?
     @State private var showSecondPlacePicker = false
     @State private var showThirdPlacePicker = false
 
-
-    
     // Winner celebration settings
     @AppStorage("winnerCelebration_enabled") private var winnerCelebrationEnabled: Bool = true
     @AppStorage("winnerCelebration_showForMultiRound") private var showCelebrationForMultiRound: Bool = false
@@ -50,7 +47,7 @@ struct RunGameView: View {
     @State private var showWinnerCelebrationOverlay = false
     @State private var celebrationTitle: String = ""
     @State private var celebrationLines: [String] = []
-    
+
     @ViewBuilder
     private var winnerCelebrationLayer: some View {
         if showWinnerCelebrationOverlay {
@@ -81,31 +78,35 @@ struct RunGameView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                         showAfterRoundDialog = true
                     }
-                },
+                }
             )
             .transition(.opacity.combined(with: .scale))
             .zIndex(200)
         }
     }
 
-    
-    
     var body: some View {
         ZStack {
             themeManager.background
                 .ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                content
-                Spacer()
+            // Scroll ONLY the main content (teams list gets tall)
+            ScrollView {
+                VStack(spacing: 12) {
+                    content
+                }
+                .padding(.horizontal)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
             }
-            .padding()
+            .safeAreaPadding(.top)
+            .safeAreaPadding(.bottom)
 
+            // Overlays stay above scroll content
             if event.status == .paused {
                 pausedOverlay
             }
 
-            // ✅ ADD THIS (winner overlay)
             winnerCelebrationLayer
 
             if showTransition {
@@ -115,7 +116,6 @@ struct RunGameView: View {
                 .transition(.opacity)
                 .zIndex(100)
             }
-
         }
         .navigationTitle("Run Game")
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -132,7 +132,7 @@ struct RunGameView: View {
                         .foregroundColor(themeManager.text)
                 }
             }
-            
+
             ToolbarItemGroup(placement: .topBarTrailing) {
                 // Pause/Resume button
                 if event.status == .active {
@@ -148,13 +148,13 @@ struct RunGameView: View {
                     }
                     .foregroundColor(themeManager.text)
                 }
-                
+
                 // Skip Game button (only when game is active and not paused)
                 if currentGame != nil && event.status == .active {
                     Button("Skip Game") { showSkipConfirmation = true }
                         .foregroundColor(themeManager.text)
                 }
-                
+
                 // Pick Game button
                 Button("Pick Game") { showPickNextGame = true }
                     .foregroundColor(themeManager.text)
@@ -179,37 +179,65 @@ struct RunGameView: View {
                     }
                 }
         }
-        .confirmationDialog("What would you like to do next?", isPresented: $showAfterRoundDialog, titleVisibility: .visible) {
+
+        // ✅ UPDATED: Differentiated primary action using iconography + weight (Option 4)
+        .confirmationDialog(
+            "What would you like to do next?",
+            isPresented: $showAfterRoundDialog,
+            titleVisibility: .visible
+        ) {
             if let eg = currentGame {
-                Button("Play Another Round") {
-                    do { 
+                Button {
+                    do {
                         _ = try engine.createNextRound(for: eg)
                         isInPostRoundDecision = false
                         showAfterRoundDialog = false
-                    } catch { 
-                        show(error) 
+                    } catch {
+                        show(error)
                     }
+                } label: {
+                    Label("Play Another Round", systemImage: "arrow.triangle.2.circlepath")
                 }
-                
-                Button("Continue to Next Game") {
+
+                Button {
                     isInPostRoundDecision = false
                     showAfterRoundDialog = false
                     handlePickNextGameRandom(currentGame: eg)
+                } label: {
+                    Label("Continue to Next Game", systemImage: "arrow.right.circle.fill")
                 }
-                
-                Button("Manually Choose Next Game") {
+                .fontWeight(.semibold)
+
+                Button {
                     isInPostRoundDecision = false
                     showAfterRoundDialog = false
                     showPickNextGame = true
+                } label: {
+                    Label("Manually Choose Next Game", systemImage: "list.bullet.rectangle")
                 }
-                
-                Button("View Event Stats") {
+
+                Button {
                     showEventStats = true
                     // Don't clear isInPostRoundDecision - we want to come back
+                } label: {
+                    Label("View Event Stats", systemImage: "chart.bar.fill")
+                }
+
+                Button(role: .cancel) { } label: {
+                    Label("Cancel", systemImage: "xmark")
+                }
+            } else {
+                Button(role: .cancel) { } label: {
+                    Label("Cancel", systemImage: "xmark")
                 }
             }
         }
-        .confirmationDialog("Select 2nd place", isPresented: $showSecondPlacePicker, titleVisibility: .visible) {
+
+        .confirmationDialog(
+            "Select 2nd place",
+            isPresented: $showSecondPlacePicker,
+            titleVisibility: .visible
+        ) {
             if let round = currentRound, let winnerId = selectedWinnerTeamId {
                 ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
                     if t.id != winnerId {
@@ -224,7 +252,12 @@ struct RunGameView: View {
             }
             Button("Cancel", role: .cancel) { }
         }
-        .confirmationDialog("Select 3rd place", isPresented: $showThirdPlacePicker, titleVisibility: .visible) {
+
+        .confirmationDialog(
+            "Select 3rd place",
+            isPresented: $showThirdPlacePicker,
+            titleVisibility: .visible
+        ) {
             if let round = currentRound, let winnerId = selectedWinnerTeamId, let secondId = selectedSecondTeamId {
                 ForEach(Array(round.teams.enumerated()), id: \.element.id) { index, t in
                     if t.id != winnerId && t.id != secondId {
@@ -239,12 +272,18 @@ struct RunGameView: View {
             }
             Button("Cancel", role: .cancel) { }
         }
+
         .alert("Message", isPresented: $showMessage) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(message ?? "Unknown error")
         }
-        .confirmationDialog("Reset Event", isPresented: $showResetConfirm, titleVisibility: .visible) {
+
+        .confirmationDialog(
+            "Reset Event",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
             Button("Reset Event", role: .destructive) {
                 do {
                     try EventEngine(context: context).resetEvent(event)
@@ -256,7 +295,12 @@ struct RunGameView: View {
         } message: {
             Text("This will reset all games to 'not started', delete all rounds and statistics. Participants will be kept.")
         }
-        .confirmationDialog("Skip Current Game", isPresented: $showSkipConfirmation, titleVisibility: .visible) {
+
+        .confirmationDialog(
+            "Skip Current Game",
+            isPresented: $showSkipConfirmation,
+            titleVisibility: .visible
+        ) {
             Button("Skip to Next Game", role: .destructive) {
                 handleSkipGame()
             }
@@ -270,17 +314,17 @@ struct RunGameView: View {
         ZStack {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 Image(systemName: "pause.circle.fill")
                     .font(.system(size: 80))
                     .foregroundStyle(.white)
-                
+
                 Text("Event Paused")
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
-                
+
                 Button("Resume") {
                     do { try engine.resumeEvent(event) }
                     catch { show(error) }
@@ -337,7 +381,7 @@ struct RunGameView: View {
                     if eg.rounds.isEmpty {
                         Text("No rounds created yet.")
                             .foregroundStyle(.secondary)
-                        
+
                         Button("Start First Round") {
                             do {
                                 _ = try engine.createNextRound(for: eg)
@@ -352,7 +396,7 @@ struct RunGameView: View {
                         Text("All rounds complete!")
                             .font(.title3)
                             .foregroundStyle(.secondary)
-                        
+
                         Button("Choose Next Game") {
                             isInPostRoundDecision = true
                             showAfterRoundDialog = true
@@ -475,7 +519,7 @@ struct RunGameView: View {
             }
         }
     }
-    
+
     private func teamColor(for index: Int) -> Color {
         let colors: [Color] = [.red, .green, .yellow, .blue, .orange, .purple]
         return index < colors.count ? colors[index] : .primary
@@ -508,7 +552,6 @@ struct RunGameView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                             beginPlacementFlow(for: round)
                         }
-
                     } catch {
                         show(error)
                     }
@@ -587,8 +630,6 @@ struct RunGameView: View {
         }
     }
 
-
-
     private func previousRoundsCompact(eventGame: EventGame) -> some View {
         let completed = eventGame.rounds
             .sorted { $0.roundIndex > $1.roundIndex }
@@ -638,18 +679,13 @@ struct RunGameView: View {
             isInPostRoundDecision = true
             showAfterRoundDialog = true
         }
-
     }
 
-
     private func shouldShowWinnerCelebration(for round: Round) -> Bool {
-        // If you later add "roundsPerGame" to templates, this can be more intelligent.
-        // For now: treat "multi-round" as "this game already has completed rounds."
-        // i.e., if there were previous completed rounds, default to NOT celebrating unless user enables it.
         guard let eg = round.eventGame else { return true }
         let completedRoundCount = eg.rounds.filter { $0.completedAt != nil }.count
 
-        if completedRoundCount > 1 { // means we are in a game that has been played across multiple rounds
+        if completedRoundCount > 1 {
             return showCelebrationForMultiRound
         }
         return true
@@ -662,8 +698,6 @@ struct RunGameView: View {
             return
         }
 
-        // Build 1st/2nd place lines using round.placements computed by EventEngine.finalizeRound
-        // placements: [personId: placementInt]
         let placements = round.placements
 
         let first = placements
@@ -684,30 +718,20 @@ struct RunGameView: View {
         celebrationTitle = "Congratulations!"
         var lines: [String] = []
 
-        if !first.isEmpty {
-            lines.append("1st Place: " + first.joined(separator: ", "))
-        }
-        if !second.isEmpty {
-            lines.append("2nd Place: " + second.joined(separator: ", "))
-        }
-        if !third.isEmpty {
-            lines.append("3rd Place: " + third.joined(separator: ", "))
-        }
+        if !first.isEmpty { lines.append("1st Place: " + first.joined(separator: ", ")) }
+        if !second.isEmpty { lines.append("2nd Place: " + second.joined(separator: ", ")) }
+        if !third.isEmpty { lines.append("3rd Place: " + third.joined(separator: ", ")) }
 
-        if lines.isEmpty {
-            lines = ["Winners recorded"]
-        }
+        if lines.isEmpty { lines = ["Winners recorded"] }
 
         celebrationLines = lines
     }
 
-    
     private func handlePickNextGameRandom(currentGame: EventGame) {
         do {
             try engine.completeGame(currentGame)
-            
+
             if let next = try engine.pickNextGameRandom(event: event) {
-                // Store the next game and show transition
                 pendingNextGame = next
                 withAnimation {
                     showTransition = true
@@ -729,12 +753,10 @@ struct RunGameView: View {
                 return
             }
 
-            // Complete current game if there is one
-            if let cg = currentGame { 
-                try engine.completeGame(cg) 
+            if let cg = currentGame {
+                try engine.completeGame(cg)
             }
-            
-            // Store the next game and show transition
+
             pendingNextGame = selection
             withAnimation {
                 showTransition = true
@@ -743,16 +765,14 @@ struct RunGameView: View {
             show(error)
         }
     }
-    
+
     private func completeTransition() {
         do {
-            // Start the pending game
             if let nextGame = pendingNextGame {
                 try engine.start(event: event, eventGame: nextGame)
                 try context.save()
             }
-            
-            // Hide transition
+
             withAnimation {
                 showTransition = false
             }
@@ -768,19 +788,16 @@ struct RunGameView: View {
 
     private func handleSkipGame() {
         guard let game = currentGame else { return }
-        
-        // Get current player IDs
+
         let playerIds: [UUID]
         if let round = currentRound, !round.teams.isEmpty {
             playerIds = round.teams.flatMap { $0.memberPersonIds }
         } else {
             playerIds = []
         }
-        
+
         do {
             try engine.skipToNextGame(game, keepingPlayers: playerIds)
-            
-            // Force view refresh
             try context.save()
         } catch {
             show(error)
@@ -805,7 +822,7 @@ struct PickNextGameSheet: View {
 
     @Query(sort: \GameTemplate.name)
     private var templates: [GameTemplate]
-    
+
     // Filter and sort state
     @State private var searchText = ""
     @AppStorage("pickNextGame_filterTeamSize") private var filterTeamSize: Int?
@@ -813,13 +830,13 @@ struct PickNextGameSheet: View {
     @AppStorage("pickNextGame_sortOption") private var sortOption: SortOption = .orderIndex
     @AppStorage("pickNextGame_teamTypeFilter") private var teamTypeFilter: TeamTypeFilter = .all
     @AppStorage("pickNextGame_statusFilter") private var statusFilter: StatusFilter = .active
-    
+
     enum SortOption: String, CaseIterable, Codable {
         case orderIndex = "Order"
         case alphabetical = "A-Z"
         case reverseAlphabetical = "Z-A"
     }
-    
+
     enum TeamTypeFilter: String, CaseIterable, Codable {
         case all = "All"
         case any = "Any"
@@ -827,7 +844,7 @@ struct PickNextGameSheet: View {
         case femaleOnly = "Female Only"
         case couplesOnly = "Couples Only"
     }
-    
+
     enum StatusFilter: String, CaseIterable, Codable {
         case active = "Active"
         case notStarted = "Not Started"
@@ -837,9 +854,7 @@ struct PickNextGameSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                // Filters section
                 Section {
-                    // Search bar
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
@@ -855,7 +870,7 @@ struct PickNextGameSheet: View {
                         }
                     }
                     .padding(.vertical, 4)
-                    
+
                     HStack {
                         Picker("Team Size", selection: $filterTeamSize) {
                             Text("Any").tag(nil as Int?)
@@ -864,7 +879,7 @@ struct PickNextGameSheet: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        
+
                         Picker("Teams", selection: $filterTeamCount) {
                             Text("Any").tag(nil as Int?)
                             ForEach(availableTeamCounts, id: \.self) { count in
@@ -873,7 +888,7 @@ struct PickNextGameSheet: View {
                         }
                         .pickerStyle(.menu)
                     }
-                    
+
                     HStack {
                         Picker("Sort", selection: $sortOption) {
                             ForEach(SortOption.allCases, id: \.self) { option in
@@ -881,7 +896,7 @@ struct PickNextGameSheet: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        
+
                         Picker("Team Type", selection: $teamTypeFilter) {
                             ForEach(TeamTypeFilter.allCases, id: \.self) { filter in
                                 Text(filter.rawValue).tag(filter)
@@ -889,7 +904,7 @@ struct PickNextGameSheet: View {
                         }
                         .pickerStyle(.menu)
                     }
-                    
+
                     Picker("Status", selection: $statusFilter) {
                         ForEach(StatusFilter.allCases, id: \.self) { filter in
                             Text(filter.rawValue).tag(filter)
@@ -899,8 +914,7 @@ struct PickNextGameSheet: View {
                 } header: {
                     Text("\(statusFilter.rawValue) Games (\(filteredAndSortedGames.count))")
                 }
-                
-                // Eligible games list
+
                 Section("Select Game") {
                     ForEach(filteredAndSortedGames) { eg in
                         Button {
@@ -912,7 +926,6 @@ struct PickNextGameSheet: View {
                     }
                 }
 
-                // Skip options
                 if !filteredAndSortedGames.isEmpty {
                     Section("Skip Options") {
                         ForEach(filteredAndSortedGames) { eg in
@@ -940,9 +953,7 @@ struct PickNextGameSheet: View {
             }
         }
     }
-    
-    // MARK: - Computed Properties
-    
+
     private var availableTeamSizes: [Int] {
         let sizes = eligibleGames.compactMap { eg -> Int? in
             let t = template(for: eg)
@@ -950,7 +961,7 @@ struct PickNextGameSheet: View {
         }
         return Array(Set(sizes)).sorted()
     }
-    
+
     private var availableTeamCounts: [Int] {
         let counts = eligibleGames.compactMap { eg -> Int? in
             let t = template(for: eg)
@@ -961,53 +972,43 @@ struct PickNextGameSheet: View {
 
     private var eligibleGames: [EventGame] {
         let games = event.eventGames
-        
+
         switch statusFilter {
         case .notStarted:
-            // Only show games that haven't been touched
             return games.filter { $0.status == .notStarted }
-            
+
         case .active:
-            // Show games that haven't had a winner recorded yet
             return games.filter { eg in
-                // Include not started games
-                if eg.status == .notStarted {
-                    return true
-                }
-                
-                // Include in-progress games that don't have a completed round with a winner
+                if eg.status == .notStarted { return true }
+
                 if eg.status == .inProgress {
                     let hasCompletedRoundWithWinner = eg.rounds.contains { round in
-                        round.completedAt != nil && 
+                        round.completedAt != nil &&
                         (round.winningTeamId != nil || round.resultType == .tie)
                     }
                     return !hasCompletedRoundWithWinner
                 }
-                
                 return false
             }
-            
+
         case .allGames:
-            // Show everything
             return games
         }
     }
-    
+
     private var filteredAndSortedGames: [EventGame] {
         var result = eligibleGames
-        
-        // Apply search filter
+
         if !searchText.isEmpty {
             result = result.filter { eg in
                 let t = template(for: eg)
                 let name = t?.name ?? ""
                 let group = t?.groupName ?? ""
                 return name.localizedCaseInsensitiveContains(searchText) ||
-                       group.localizedCaseInsensitiveContains(searchText)
+                group.localizedCaseInsensitiveContains(searchText)
             }
         }
-        
-        // Apply team size filter
+
         if let filterTeamSize {
             result = result.filter { eg in
                 let t = template(for: eg)
@@ -1015,8 +1016,7 @@ struct PickNextGameSheet: View {
                 return size == filterTeamSize
             }
         }
-        
-        // Apply team count filter
+
         if let filterTeamCount {
             result = result.filter { eg in
                 let t = template(for: eg)
@@ -1024,13 +1024,12 @@ struct PickNextGameSheet: View {
                 return count == filterTeamCount
             }
         }
-        
-        // Apply team type filter
+
         if teamTypeFilter != .all {
             result = result.filter { eg in
                 let t = template(for: eg)
                 let teamType = eg.overrideTeamType ?? t?.defaultTeamType ?? .any
-                
+
                 switch teamTypeFilter {
                 case .all:
                     return true
@@ -1045,8 +1044,7 @@ struct PickNextGameSheet: View {
                 }
             }
         }
-        
-        // Apply sort
+
         switch sortOption {
         case .orderIndex:
             result.sort { $0.orderIndex < $1.orderIndex }
@@ -1063,7 +1061,7 @@ struct PickNextGameSheet: View {
                 return n1.localizedCaseInsensitiveCompare(n2) == .orderedDescending
             }
         }
-        
+
         return result
     }
 
@@ -1149,10 +1147,10 @@ struct SwapPlayerSheet: View {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Event.self, Person.self, GameTemplate.self, configurations: config)
-    
+
     let event = Event(name: "Test Event")
     container.mainContext.insert(event)
-    
+
     return NavigationStack {
         RunGameView(event: event)
     }
